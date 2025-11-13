@@ -9,6 +9,7 @@ import {
   StatusBar,
   ActivityIndicator,
   Platform,
+  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -186,19 +187,30 @@ export default function MealVistaSignUp() {
         email: email.trim().toLowerCase(),
         password,
       });
-      
-      // Route based on user role
-      if (response.user?.isAdmin === true || response.user?.role === 'admin') {
-        router.replace("/admin/dashboard");
-      } else {
-        // New users always go to onboarding
-        router.replace("/dietaryPreference");
-      }
+
+      // Immediately navigate to login after successful signup
+      router.replace("/signIn");
     } catch (error: unknown) {
-      const message =
-        typeof error === "object" && error !== null && "response" in error
-          ? (error as any).response?.data?.message ?? "Unable to sign up"
-          : "Unable to sign up";
+      console.error('Signup error:', error);
+      let message = "Unable to sign up";
+
+      if (typeof error === "object" && error !== null) {
+        if ("response" in error) {
+          // Server returned an error response
+          message = (error as any).response?.data?.message ?? "Unable to sign up";
+        } else if ((error as any).message === "Network Error") {
+          // Network error (server not reachable)
+          message = "Unable to connect to server. Please check your internet connection and try again.";
+        } else if (error instanceof Error) {
+          message = error.message;
+        }
+      }
+
+      Alert.alert(
+        "Sign Up Failed",
+        message,
+        [{ text: "OK" }]
+      );
       setErrorMessage(message);
     } finally {
       setLoading(false);

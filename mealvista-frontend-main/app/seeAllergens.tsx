@@ -23,7 +23,7 @@ interface Ingredient {
 export default function SeeAllergens() {
   const router = useRouter();
   const params = useLocalSearchParams();
-  const { addToCart } = useCart();
+  const { addToCart, getTotalItems } = useCart();
   const [selectedIngredients, setSelectedIngredients] = useState<string[]>([]);
 
   const mealTitle = params.mealTitle as string || "Classic Pasta Carbonara";
@@ -97,7 +97,14 @@ export default function SeeAllergens() {
           <Feather name="arrow-left" size={24} color="#fff" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Recipe Allergens</Text>
-        <View style={styles.headerSpacer} />
+        <TouchableOpacity style={styles.cartButton} onPress={() => router.push('/viewCart')}>
+          <Feather name="shopping-cart" size={20} color="#fff" />
+          {getTotalItems() > 0 && (
+            <View style={styles.cartBadge}>
+              <Text style={styles.cartBadgeText}>{getTotalItems()}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
       </View>
 
       <ScrollView
@@ -156,49 +163,7 @@ export default function SeeAllergens() {
           ))}
         </View>
 
-        {/* Ingredients List */}
-        <View style={styles.ingredientsSection}>
-          <Text style={styles.sectionTitle}>Ingredients</Text>
-          {ingredients.map((ingredient) => {
-            const isSelected = selectedIngredients.includes(ingredient.id);
-            return (
-              <TouchableOpacity
-                key={ingredient.id}
-                style={[
-                  styles.ingredientCard,
-                  isSelected && styles.ingredientCardSelected,
-                ]}
-                onPress={() => handleToggleIngredient(ingredient.id)}
-              >
-                <View style={[styles.checkbox, isSelected && styles.checkboxSelected]}>
-                  {isSelected && (
-                    <Feather name="check" size={16} color="#fff" />
-                  )}
-                </View>
-                <View style={styles.ingredientInfo}>
-                  <Text style={styles.ingredientName}>{ingredient.name}</Text>
-                  <Text style={styles.ingredientCategory}>
-                    {ingredient.category}
-                  </Text>
-                </View>
-                <Text style={styles.ingredientPrice}>Rs {ingredient.price}</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-
-        {/* Action Buttons */}
-        <TouchableOpacity
-          style={styles.addToCartButton}
-          onPress={handleAddToCart}
-          disabled={selectedIngredients.length === 0}
-        >
-          <Feather name="shopping-cart" size={18} color="#fff" />
-          <Text style={styles.addToCartButtonText}>
-            Add to Cart ({selectedIngredients.length})
-          </Text>
-        </TouchableOpacity>
-
+        {/* Only show allergens and allow seeing substitutions */}
         <TouchableOpacity
           style={styles.substitutionsButton}
           onPress={handleSeeSubstitutions}
@@ -244,6 +209,23 @@ const styles = StyleSheet.create({
   headerSpacer: {
     width: 32,
   },
+  cartButton: {
+    padding: 6,
+    marginRight: 2,
+  },
+  cartBadge: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    backgroundColor: '#FF6B6B',
+    borderRadius: 10,
+    minWidth: 18,
+    height: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  cartBadgeText: { color: '#fff', fontSize: 11, fontWeight: '700' },
   scrollView: {
     flex: 1,
   },

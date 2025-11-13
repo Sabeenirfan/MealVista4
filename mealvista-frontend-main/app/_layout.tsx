@@ -1,10 +1,12 @@
 import { Stack } from "expo-router";
 import { CartProvider } from "../contexts/CartContext";
+import { FavoritesProvider } from "../contexts/FavoritesContext";
 
 export default function Layout() {
   return (
     <CartProvider>
-      <Stack screenOptions={{ headerShown: false }}>
+      <FavoritesProvider>
+        <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" /> {/* Splash */}
         <Stack.Screen name="signUp" /> {/* Sign Up */}
         <Stack.Screen name="signIn" /> {/* Sign In */}
@@ -15,6 +17,8 @@ export default function Layout() {
         <Stack.Screen name="allergenPreference" /> {/* Allergen Preference */}
         <Stack.Screen name="home" /> {/* Home Screen */}
         <Stack.Screen name="profile" /> {/* Profile Screen */}
+        <Stack.Screen name="favorites" /> {/* Favorites */}
+  <Stack.Screen name="editProfile" /> {/* Edit Profile */}
         <Stack.Screen name="recipeDetails" /> {/* Recipe Details */}
         <Stack.Screen name="instructions" /> {/* Instructions */}
         <Stack.Screen name="nutritionalBreakdown" /> {/* Nutritional Breakdown */}
@@ -29,7 +33,8 @@ export default function Layout() {
         <Stack.Screen name="paymentSuccessful" /> {/* Payment Successful */}
         <Stack.Screen name="orderHistory" /> {/* Order History */}
         <Stack.Screen name="admin" /> {/* Admin Panel */}
-      </Stack>
+        </Stack>
+      </FavoritesProvider>
     </CartProvider>
   );
 }

@@ -9,6 +9,7 @@ import {
   StatusBar,
 } from 'react-native';
 import { Feather } from "@expo/vector-icons";
+import { useFavorites } from "../contexts/FavoritesContext";
 import { useRouter } from 'expo-router';
 import { useCart } from '../contexts/CartContext';
 
@@ -27,10 +28,14 @@ interface MealCardProps {
   meal: Meal;
   size?: 'normal' | 'large';
   onPress?: () => void;
+  onBookmarkPress?: () => void;
+  favorited?: boolean;
 }
 
-const MealCard = ({ meal, size = 'normal', onPress }: MealCardProps) => {
+const MealCard = ({ meal, size = 'normal', onPress, onBookmarkPress, favorited = false }: MealCardProps) => {
   const isLarge = size === 'large';
+  // Note: meal.id may not be present in sample data; compute fallback id using title
+  const id = (meal as any).id ?? meal.title.replace(/\s+/g, '-').toLowerCase();
 
   return (
     <TouchableOpacity 
@@ -46,8 +51,8 @@ const MealCard = ({ meal, size = 'normal', onPress }: MealCardProps) => {
             <Text style={styles.trendingText}>Trending</Text>
           </View>
         )}
-        <TouchableOpacity style={styles.bookmarkButton}>
-          <Feather name="bookmark" size={18} color="#3C2253" />
+        <TouchableOpacity style={styles.bookmarkButton} onPress={onBookmarkPress}>
+          <Feather name="bookmark" size={18} color={favorited ? '#FF6B6B' : '#3C2253'} />
         </TouchableOpacity>
       </View>
       <View style={styles.mealInfo}>
@@ -94,6 +99,7 @@ const MealCard = ({ meal, size = 'normal', onPress }: MealCardProps) => {
 export default function Home() {
   const router = useRouter();
   const { getTotalItems } = useCart();
+  const { favorites, toggleFavorite, isFavorited } = useFavorites();
 
   const recommendedMeals: Meal[] = [
     {
@@ -175,6 +181,19 @@ export default function Home() {
     });
   };
 
+  const handleBookmarkPress = (meal: Meal) => {
+    const id = (meal as any).id ?? meal.title.replace(/\s+/g, '-').toLowerCase();
+    toggleFavorite({
+      id,
+      title: meal.title,
+      image: meal.image,
+      time: meal.time,
+      calories: meal.calories,
+      difficulty: meal.difficulty,
+      rating: meal.rating,
+    });
+  };
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#3C2253" />
@@ -199,6 +218,12 @@ export default function Home() {
               </View>
             )}
           </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.iconButton}
+            onPress={() => router.push('/profile')}
+          >
+            <Feather name="user" size={20} color="#fff" />
+          </TouchableOpacity>
         </View>
       </View>
       <ScrollView
@@ -213,14 +238,20 @@ export default function Home() {
           </Text>
         </View>
         <View style={styles.gridContainer}>
-          {recommendedMeals.map((meal, index) => (
-            <View key={index} style={styles.gridItem}>
-              <MealCard 
-                meal={meal} 
-                onPress={() => handleMealPress(meal)}
-              />
-            </View>
-          ))}
+          {recommendedMeals.map((meal, index) => {
+            const id = (meal as any).id ?? meal.title.replace(/\s+/g, '-').toLowerCase();
+            const mealWithId = { ...(meal as any), id } as Meal & { id: string };
+            return (
+              <View key={index} style={styles.gridItem}>
+                <MealCard
+                  meal={mealWithId}
+                  onPress={() => handleMealPress(mealWithId)}
+                  onBookmarkPress={() => handleBookmarkPress(mealWithId)}
+                  favorited={isFavorited(id)}
+                />
+              </View>
+            );
+          })}
         </View>
         {/* Trending Section */}
         <View style={styles.trendingHeader}>
@@ -232,22 +263,37 @@ export default function Home() {
         </View>
         {/* Featured Trending Meal */}
         <View style={styles.featuredContainer}>
-          <MealCard 
-            meal={trendingMeals[0]} 
-            size="large" 
-            onPress={() => handleMealPress(trendingMeals[0])}
-          />
+          {(() => {
+            const meal = trendingMeals[0];
+            const id = (meal as any).id ?? meal.title.replace(/\s+/g, '-').toLowerCase();
+            const mealWithId = { ...(meal as any), id } as Meal & { id: string };
+            return (
+              <MealCard
+                meal={mealWithId}
+                size="large"
+                onPress={() => handleMealPress(mealWithId)}
+                onBookmarkPress={() => handleBookmarkPress(mealWithId)}
+                favorited={isFavorited(id)}
+              />
+            );
+          })()}
         </View>
         {/* Other Trending Meals */}
         <View style={styles.gridContainer}>
-          {trendingMeals.slice(1).map((meal, index) => (
-            <View key={index} style={styles.gridItem}>
-              <MealCard 
-                meal={meal} 
-                onPress={() => handleMealPress(meal)}
-              />
-            </View>
-          ))}
+          {trendingMeals.slice(1).map((meal, index) => {
+            const id = (meal as any).id ?? meal.title.replace(/\s+/g, '-').toLowerCase();
+            const mealWithId = { ...(meal as any), id } as Meal & { id: string };
+            return (
+              <View key={index} style={styles.gridItem}>
+                <MealCard
+                  meal={mealWithId}
+                  onPress={() => handleMealPress(mealWithId)}
+                  onBookmarkPress={() => handleBookmarkPress(mealWithId)}
+                  favorited={isFavorited(id)}
+                />
+              </View>
+            );
+          })}
         </View>
         <View style={styles.bottomSpacer} />
       </ScrollView>

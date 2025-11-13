@@ -120,18 +120,30 @@ export default function ProfileScreen() {
         {
           text: "Logout",
           style: "destructive",
-          onPress: async () => {
-            try {
-              await logout();
-              router.replace("/signIn");
-            } catch (error) {
-              console.error("Logout error:", error);
-              // Still redirect even if logout fails
-              router.replace("/signIn");
-            }
+          onPress: () => {
+            (async () => {
+              try {
+                await logout();
+              } catch (err) {
+                console.error("Logout error:", err);
+              } finally {
+                // Ensure we navigate to sign-in even if logout had errors.
+                try {
+                  router.replace("/signIn");
+                } catch (navErr) {
+                  // fallback push
+                  try {
+                    router.push("/signIn");
+                  } catch (e) {
+                    console.error('Navigation to signIn failed:', e);
+                  }
+                }
+              }
+            })();
           },
         },
-      ]
+      ],
+      { cancelable: true }
     );
   };
 
@@ -199,52 +211,17 @@ export default function ProfileScreen() {
             <Text style={styles.userEmail}>{user?.email || ""}</Text>
           </View>
 
-          {/* Name Input */}
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Full Name</Text>
-            <View style={[
-              styles.inputWrapper,
-              validationErrors.name && styles.inputWrapperError
-            ]}>
-              <Ionicons name="person-outline" size={20} color="#9CA3AF" style={styles.icon} />
-              <TextInput
-                style={styles.input}
-                placeholder="Enter your full name"
-                placeholderTextColor="#9CA3AF"
-                value={name}
-                onChangeText={handleNameChange}
-                autoCapitalize="words"
-              />
-            </View>
-            {validationErrors.name && (
-              <Text style={styles.errorText}>{validationErrors.name}</Text>
-            )}
+          {/* Display static account info (editing moved to separate screen) */}
+          <View style={styles.infoBlock}>
+            <Text style={styles.infoLabel}>Full Name</Text>
+            <Text style={styles.infoValue}>{user?.name || name || '—'}</Text>
           </View>
 
-          {/* Email Input */}
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Email Address</Text>
-            <View style={[
-              styles.inputWrapper,
-              validationErrors.email && styles.inputWrapperError
-            ]}>
-              <Ionicons name="mail-outline" size={20} color="#9CA3AF" style={styles.icon} />
-              <TextInput
-                style={styles.input}
-                placeholder="Enter your email"
-                placeholderTextColor="#9CA3AF"
-                value={email}
-                onChangeText={handleEmailChange}
-                keyboardType="email-address"
-                autoCapitalize="none"
-              />
-            </View>
-            {validationErrors.email && (
-              <Text style={styles.errorText}>{validationErrors.email}</Text>
-            )}
+          <View style={styles.infoBlock}>
+            <Text style={styles.infoLabel}>Email Address</Text>
+            <Text style={styles.infoValue}>{user?.email || email || '—'}</Text>
           </View>
 
-          {/* Account Info */}
           {user?.createdAt && (
             <View style={styles.infoContainer}>
               <Text style={styles.infoLabel}>Member since</Text>
@@ -265,19 +242,55 @@ export default function ProfileScreen() {
           {successMessage && (
             <Text style={styles.successText}>{successMessage}</Text>
           )}
+        </View>
 
-          {/* Save Button */}
-          <TouchableOpacity
-            style={[styles.saveButton, saving && styles.saveButtonDisabled]}
-            onPress={handleSave}
-            disabled={saving}
-            activeOpacity={0.8}
-          >
-            {saving ? (
-              <ActivityIndicator size="small" color="#FFFFFF" />
-            ) : (
-              <Text style={styles.saveButtonText}>Save Changes</Text>
-            )}
+        {/* Profile Options */}
+        <View style={styles.optionsContainer}>
+          <TouchableOpacity style={styles.optionItem} onPress={() => router.push('/dietaryPreference')}>
+            <View style={styles.optionLeft}>
+              <Ionicons name="nutrition" size={20} color="#3C2253" />
+              <Text style={styles.optionText}>Edit Dietary Preferences</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="#6B7280" />
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.optionItem} onPress={() => router.push('/allergenPreference')}>
+            <View style={styles.optionLeft}>
+              <Ionicons name="warning" size={20} color="#3C2253" />
+              <Text style={styles.optionText}>Edit Allergens Preferences</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="#6B7280" />
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.optionItem} onPress={() => router.push('/bmiCalculator')}>
+            <View style={styles.optionLeft}>
+              <Ionicons name="speedometer" size={20} color="#3C2253" />
+              <Text style={styles.optionText}>Update BMI</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="#6B7280" />
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.optionItem} onPress={() => router.push('/favorites')}>
+            <View style={styles.optionLeft}>
+              <Ionicons name="heart" size={20} color="#3C2253" />
+              <Text style={styles.optionText}>View Favorites</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="#6B7280" />
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.optionItem} onPress={() => router.push('/editProfile')}>
+            <View style={styles.optionLeft}>
+              <Ionicons name="create" size={20} color="#3C2253" />
+              <Text style={styles.optionText}>Edit Profile Info</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="#6B7280" />
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.optionItem} onPress={handleLogout}>
+            <View style={styles.optionLeft}>
+              <Ionicons name="log-out" size={20} color="#DC2626" />
+              <Text style={[styles.optionText, { color: '#DC2626' }]}>Logout</Text>
+            </View>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -417,6 +430,9 @@ const styles = StyleSheet.create({
     color: "#333333",
     fontWeight: "500",
   },
+  infoBlock: {
+    marginBottom: 16,
+  },
   saveButton: {
     backgroundColor: "#3C2253",
     borderRadius: 25,
@@ -432,6 +448,35 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 16,
     fontWeight: "600",
+  },
+  optionsContainer: {
+    paddingHorizontal: 24,
+    paddingTop: 16,
+  },
+  optionItem: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+    elevation: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+  },
+  optionLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  optionText: {
+    fontSize: 14,
+    color: '#111827',
+    fontWeight: '600',
   },
 });
 

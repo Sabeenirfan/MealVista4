@@ -98,29 +98,32 @@ export default function AllergenPreferenceScreen() {
     // Here you would save preferences to backend
     console.log("Allergen preferences saved:", selectedAllergens);
     
-    // Mark onboarding as complete
-    await setOnboardingComplete();
-    
-    if (selectedAllergens.length === 0) {
-      Alert.alert("Success", "No allergen restrictions saved", [
-        {
-          text: "OK",
-          onPress: () => {
-            // Navigate to home screen
-            router.replace("/home");
-          },
-        },
-      ]);
-    } else {
-      Alert.alert("Success", `Allergen preferences saved: ${selectedNames}`, [
-        {
-          text: "OK",
-          onPress: () => {
-            // Navigate to home screen
-            router.replace("/home");
-          },
-        },
-      ]);
+    try {
+      // Save preferences to backend (you would add API call here)
+      console.log("Allergen preferences saved:", selectedAllergens);
+      
+      // Mark onboarding as complete - this should happen BEFORE navigation
+      await setOnboardingComplete();
+      
+      // Navigate to home screen immediately without waiting for alert
+      router.push({
+        pathname: "/home",
+        replace: true
+      } as any);
+      
+      // Show success message after trying to navigate
+      Alert.alert(
+        "Success",
+        selectedAllergens.length === 0
+          ? "No allergen restrictions saved"
+          : `Allergen preferences saved: ${selectedNames}`
+      );
+    } catch (error) {
+      console.error("Error saving preferences:", error);
+      Alert.alert(
+        "Error",
+        "There was a problem saving your preferences. Please try again."
+      );
     }
   };
 

@@ -20,6 +20,7 @@ const CardDetailsScreen: React.FC = () => {
   const [cvv, setCvv] = useState<string>("");
   const [cardName, setCardName] = useState<string>("");
   const [showCvv, setShowCvv] = useState<boolean>(false);
+  const [errors, setErrors] = useState<{ cardNumber?: string; expiryDate?: string; cvv?: string; cardName?: string }>({});
 
   const orderSummary = {
     items: 8,
@@ -28,28 +29,83 @@ const CardDetailsScreen: React.FC = () => {
     total: getTotalPrice() + 30,
   };
 
-  // Format card number as 1234 5678 9012 3456
+  // Format card number as groups of 4 but limit to 12 digits (user requested exact 12 digits)
   const formatCardNumber = (text: string) => {
     const cleaned = text.replace(/\D/g, "");
-    const formatted = cleaned.match(/.{1,4}/g)?.join(" ") || cleaned;
-    setCardNumber(formatted.slice(0, 19)); // Max 16 digits + 3 spaces
+    const limited = cleaned.slice(0, 12); // exact 12 digits max
+    const formatted = limited.match(/.{1,4}/g)?.join(" ") || limited;
+    setCardNumber(formatted);
+    if (errors.cardNumber) setErrors((prev) => ({ ...prev, cardNumber: undefined }));
   };
 
   // Format expiry date as MM/YY
   const formatExpiryDate = (text: string) => {
-    const cleaned = text.replace(/\D/g, "");
-    if (cleaned.length >= 2) {
+    const cleaned = text.replace(/\D/g, "").slice(0, 4);
+    if (cleaned.length >= 3) {
       setExpiryDate(cleaned.slice(0, 2) + "/" + cleaned.slice(2, 4));
+    } else if (cleaned.length >= 2) {
+      setExpiryDate(cleaned.slice(0, 2) + (cleaned.length === 2 ? "" : "/") + cleaned.slice(2));
     } else {
       setExpiryDate(cleaned);
     }
+    if (errors.expiryDate) setErrors((prev) => ({ ...prev, expiryDate: undefined }));
+  };
+
+  const validateName = (name: string) => {
+    if (!name || name.trim().length === 0) return "Name is required";
+    const regex = /^[A-Za-z ]+$/;
+    if (!regex.test(name.trim())) return "Name must contain only letters and spaces";
+    return undefined;
+  };
+
+  const validateCardNumber = (value: string) => {
+    const digits = value.replace(/\s/g, "");
+    if (!digits) return "Card number is required";
+    if (!/^\d{12}$/.test(digits)) return "Card number must be exactly 12 digits";
+    return undefined;
+  };
+
+  const validateExpiry = (value: string) => {
+    if (!value) return "Expiry date is required";
+    const m = value.match(/^(\d{2})\/(\d{2})$/);
+    if (!m) return "Expiry must be in MM/YY format";
+    const month = parseInt(m[1], 10);
+    const year = 2000 + parseInt(m[2], 10);
+    if (month < 1 || month > 12) return "Expiry month must be between 01 and 12";
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth() + 1; // 1-based
+    if (year < currentYear || (year === currentYear && month < currentMonth)) {
+      return "Expiry date must be in the future";
+    }
+    return undefined;
+  };
+
+  const validateCvv = (value: string) => {
+    const digits = value.replace(/\D/g, "");
+    if (!digits) return "CVV is required";
+    if (digits.length < 3 || digits.length > 4) return "CVV must be 3 or 4 digits";
+    return undefined;
+  };
+
+  const runAllValidations = () => {
+    const vName = validateName(cardName);
+    const vCard = validateCardNumber(cardNumber);
+    const vExpiry = validateExpiry(expiryDate);
+    const vCvv = validateCvv(cvv);
+    const newErrors: typeof errors = {};
+    if (vName) newErrors.cardName = vName;
+    if (vCard) newErrors.cardNumber = vCard;
+    if (vExpiry) newErrors.expiryDate = vExpiry;
+    if (vCvv) newErrors.cvv = vCvv;
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
   const handlePayNow = () => {
     // Validate form
-    if (!cardNumber || !expiryDate || !cvv || !cardName) {
-      return;
-    }
+    const ok = runAllValidations();
+    if (!ok) return;
     router.push("/paymentSuccessful");
   };
 
@@ -87,14 +143,15 @@ const CardDetailsScreen: React.FC = () => {
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Card Number</Text>
             <TextInput
-              style={styles.input}
-              placeholder="1234 5678 9012 3456"
+              style={[styles.input, errors.cardNumber ? styles.inputError : null]}
+              placeholder="1234 5678 9012"
               placeholderTextColor="#B8AFCC"
               value={cardNumber}
               onChangeText={formatCardNumber}
               keyboardType="numeric"
-              maxLength={19}
+              maxLength={14} // 12 digits + 2 spaces when grouped 4-4-4 => 14 chars
             />
+            {errors.cardNumber && <Text style={styles.errorText}>{errors.cardNumber}</Text>}
           </View>
 
           {/* Expiry Date and CVV */}
@@ -102,7 +159,7 @@ const CardDetailsScreen: React.FC = () => {
             <View style={[styles.inputGroup, styles.halfInput]}>
               <Text style={styles.label}>Expiry Date</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, errors.expiryDate ? styles.inputError : null]}
                 placeholder="MM/YY"
                 placeholderTextColor="#B8AFCC"
                 value={expiryDate}
@@ -110,18 +167,21 @@ const CardDetailsScreen: React.FC = () => {
                 keyboardType="numeric"
                 maxLength={5}
               />
+              {errors.expiryDate && <Text style={styles.errorText}>{errors.expiryDate}</Text>}
             </View>
             <View style={[styles.inputGroup, styles.halfInput]}>
               <Text style={styles.label}>CVV</Text>
               <View style={styles.cvvContainer}>
                 <TextInput
-                  style={[styles.input, styles.cvvInput]}
+                  style={[styles.input, styles.cvvInput, errors.cvv ? styles.inputError : null]}
                   placeholder="123"
                   placeholderTextColor="#B8AFCC"
                   value={cvv}
-                  onChangeText={(text) =>
-                    setCvv(text.replace(/\D/g, "").slice(0, 4))
-                  }
+                  onChangeText={(text) => {
+                    const cleaned = text.replace(/\D/g, "").slice(0, 4);
+                    setCvv(cleaned);
+                    if (errors.cvv) setErrors((prev) => ({ ...prev, cvv: undefined }));
+                  }}
                   keyboardType="numeric"
                   maxLength={4}
                   secureTextEntry={!showCvv}
@@ -137,6 +197,7 @@ const CardDetailsScreen: React.FC = () => {
                   />
                 </TouchableOpacity>
               </View>
+              {errors.cvv && <Text style={styles.errorText}>{errors.cvv}</Text>}
             </View>
           </View>
 
@@ -144,13 +205,17 @@ const CardDetailsScreen: React.FC = () => {
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Name on Card</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, errors.cardName ? styles.inputError : null]}
               placeholder="John Doe"
               placeholderTextColor="#B8AFCC"
               value={cardName}
-              onChangeText={setCardName}
+              onChangeText={(text) => {
+                setCardName(text);
+                if (errors.cardName) setErrors((prev) => ({ ...prev, cardName: undefined }));
+              }}
               autoCapitalize="words"
             />
+            {errors.cardName && <Text style={styles.errorText}>{errors.cardName}</Text>}
           </View>
 
           {/* Secure Payment Info */}
@@ -251,6 +316,9 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: "#2C1A3F",
   },
+  inputError: {
+    borderColor: "#DC2626",
+  },
   rowInputs: { flexDirection: "row", justifyContent: "space-between", gap: 12 },
   halfInput: { flex: 1 },
   cvvContainer: { position: "relative" },
@@ -324,6 +392,11 @@ const styles = StyleSheet.create({
   },
   lockIcon: { marginRight: 8 },
   payButtonText: { fontSize: 16, fontWeight: "600", color: "#fff" },
+  errorText: {
+    color: "#DC2626",
+    fontSize: 12,
+    marginTop: 6,
+  },
 });
 
 export default CardDetailsScreen;

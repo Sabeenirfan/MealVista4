@@ -69,6 +69,9 @@ const CookingInstructionsScreen: React.FC = () => {
             <Ionicons name="arrow-back" size={24} color="#fff" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Cooking Instructions</Text>
+          <TouchableOpacity style={styles.homeButton} onPress={() => router.push('/home')}>
+            <Ionicons name="home" size={22} color="#fff" />
+          </TouchableOpacity>
         </View>
         <View style={styles.recipeCard}>
           <Image
@@ -125,12 +128,12 @@ const CookingInstructionsScreen: React.FC = () => {
           ))}
         </View>
       </ScrollView>
-      <View style={styles.bottomButtons}>
+        <View style={styles.bottomButtons}>
         <TouchableOpacity style={styles.readButton}>
           <Ionicons name="volume-medium" size={20} color="#fff" />
           <Text style={styles.readButtonText}>Read instructions</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.backButtonBottom} onPress={handleBack}>
+        <TouchableOpacity style={styles.backButtonBottom} onPress={() => {}} disabled>
           <Ionicons name="arrow-back" size={20} color="#5A3D7A" />
           <Text style={styles.backButtonText}>Back</Text>
         </TouchableOpacity>
@@ -151,9 +154,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: 16,
     paddingTop: 8,
+    justifyContent: 'space-between',
   },
   backButton: { marginRight: 16 },
-  headerTitle: { fontSize: 18, color: "#fff", fontWeight: "500" },
+  headerTitle: { fontSize: 18, color: "#fff", fontWeight: "500", flex: 1, textAlign: 'center' },
+  homeButton: { marginLeft: 12 },
   recipeCard: {
     margin: 16,
     backgroundColor: "#fff",

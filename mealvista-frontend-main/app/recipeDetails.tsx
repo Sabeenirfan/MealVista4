@@ -23,7 +23,7 @@ interface Ingredient {
 export default function RecipeDetails() {
   const router = useRouter();
   const params = useLocalSearchParams();
-  const { getTotalItems, addToCart } = useCart();
+  const { getTotalItems, addToCart, cartItems } = useCart();
   const [selectedIngredients, setSelectedIngredients] = useState<string[]>([]);
 
   const meal = {
@@ -58,21 +58,29 @@ export default function RecipeDetails() {
       return;
     }
 
+    let addedCount = 0;
     selectedIngredients.forEach((id) => {
       const ingredient = ingredientsList.find((ing) => ing.id === id);
       if (ingredient) {
-        addToCart({
-          id: `ingredient-${ingredient.id}-${Date.now()}`,
-          name: ingredient.name,
-          price: ingredient.price,
-          category: ingredient.category,
-        });
+        const itemId = `ingredient-${ingredient.id}`;
+        const alreadyInCart = cartItems.some((c) => c.id === itemId);
+        if (!alreadyInCart) {
+          addToCart({
+            id: itemId,
+            name: ingredient.name,
+            price: ingredient.price,
+            category: ingredient.category,
+          });
+          addedCount += 1;
+        }
       }
     });
 
     Alert.alert(
       'Success',
-      `${selectedIngredients.length} ingredient(s) added to cart`,
+      addedCount > 0
+        ? `${addedCount} ingredient(s) added to cart`
+        : 'Selected ingredient(s) are already in your cart',
       [
         {
           text: 'OK',
@@ -161,7 +169,7 @@ export default function RecipeDetails() {
               <Text style={styles.metaText}>{meal.time} min</Text>
             </View>
             <View style={styles.metaBadge}>
-              <Feather name="flame" size={14} color="#666" />
+              <Feather name="zap" size={14} color="#666" />
               <Text style={styles.metaText}>{meal.calories} kcal</Text>
             </View>
             <View

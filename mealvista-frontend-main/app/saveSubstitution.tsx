@@ -10,7 +10,8 @@ import {
   Alert,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
-import { useRouter, useLocalSearchParams } from "expo-router";
+import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useCart } from '../contexts/CartContext';
 
 interface Substitution {
   id: number;
@@ -29,6 +30,7 @@ export default function SaveSubstitution() {
   const params = useLocalSearchParams();
   const mealTitle = params.mealTitle as string || "Recipe";
   const [selectedSubstitutions, setSelectedSubstitutions] = useState<number[]>([]);
+  const { addToCart, cartItems, getTotalItems } = useCart();
 
   const substitutions: Substitution[] = [
     {
@@ -112,6 +114,31 @@ export default function SaveSubstitution() {
     );
   };
 
+  const handleAddToCart = () => {
+    if (selectedSubstitutions.length === 0) {
+      Alert.alert('No Selection', 'Please select at least one substitution');
+      return;
+    }
+
+    // Add selected substitutions to cart (avoid duplicates)
+    let added = 0;
+    selectedSubstitutions.forEach((id) => {
+      const substitution = substitutions.find((s) => s.id === id);
+      if (substitution) {
+        const itemId = `sub-${substitution.id}`;
+        const exists = cartItems.some((c) => c.id === itemId);
+        if (!exists) {
+          addToCart({ id: itemId, name: substitution.name, price: 0, image: substitution.image });
+          added += 1;
+        }
+      }
+    });
+
+    Alert.alert('Added', added > 0 ? `${added} substitution(s) added to your cart` : 'Selected substitution(s) already in cart', [
+      { text: 'OK', onPress: () => router.push('/viewCart') },
+    ]);
+  };
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#3C2253" />
@@ -130,6 +157,14 @@ export default function SaveSubstitution() {
             Replace allergens with safe, healthy alternatives
           </Text>
         </View>
+        <TouchableOpacity style={styles.cartButton} onPress={() => router.push('/viewCart')}>
+          <Feather name="shopping-cart" size={20} color="#fff" />
+          {getTotalItems() > 0 && (
+            <View style={styles.cartBadge}>
+              <Text style={styles.cartBadgeText}>{getTotalItems()}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
       </View>
 
       <ScrollView
@@ -288,6 +323,14 @@ export default function SaveSubstitution() {
           <Text style={styles.applyButtonText}>Apply Substitutions</Text>
         </TouchableOpacity>
 
+        {/* Add to Cart Button (adds selected substitutions to cart) */}
+        <TouchableOpacity
+          style={[styles.applyButton, { marginTop: 12 }]}
+          onPress={handleAddToCart}
+        >
+          <Text style={styles.applyButtonText}>Add to Cart ({selectedSubstitutions.length})</Text>
+        </TouchableOpacity>
+
         <View style={styles.bottomSpacer} />
       </ScrollView>
     </View>
@@ -311,6 +354,23 @@ const styles = StyleSheet.create({
     padding: 4,
     marginRight: 12,
   },
+  cartButton: {
+    padding: 6,
+    marginRight: 2,
+  },
+  cartBadge: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    backgroundColor: '#FF6B6B',
+    borderRadius: 10,
+    minWidth: 18,
+    height: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  cartBadgeText: { color: '#fff', fontSize: 11, fontWeight: '700' },
   headerContent: {
     flex: 1,
   },

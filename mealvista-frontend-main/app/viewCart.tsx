@@ -35,6 +35,12 @@ const CartScreen: React.FC = () => {
           <Ionicons name="arrow-back" size={24} color="#fff" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Your Cart</Text>
+        <TouchableOpacity 
+          style={styles.headerIcon}
+          onPress={() => router.push('/home')}
+        >
+          <Ionicons name="home-outline" size={24} color="#fff" />
+        </TouchableOpacity>
         <TouchableOpacity style={styles.cartIconContainer}>
           <Ionicons name="cart-outline" size={24} color="#fff" />
           {itemCount > 0 && (
@@ -180,6 +186,10 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     flex: 1,
     marginLeft: 16,
+  },
+  headerIcon: {
+    padding: 4,
+    marginRight: 12,
   },
   cartIconContainer: { position: "relative" },
   badge: {
