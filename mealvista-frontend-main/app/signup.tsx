@@ -484,7 +484,6 @@ export default function MealVistaSignUp() {
                   <Text style={styles.googleButtonText}>Continue with Google</Text>
                 </View>
               </TouchableOpacity>
-              <Text style={styles.helperText}>{googleClientIdIssue}</Text>
             </>
           ) : (
             <GoogleAuthButton />

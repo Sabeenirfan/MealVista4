@@ -101,13 +101,6 @@ export default function HomeScreen() {
           >
             <Text style={styles.buttonText}>Get Started</Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.signInButton}
-            onPress={() => router.push("/signIn")}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.signInButtonText}>Already have an account? Sign In</Text>
-          </TouchableOpacity>
         </View>
       </View>
     </View>
@@ -160,7 +153,7 @@ const styles = StyleSheet.create({
   },
   title: {
     color: "#FFFFFF",
-    fontSize: getResponsiveSize(56),
+    fontSize: getResponsiveSize(90),
     fontFamily: "Rubik_700Bold",
     textAlign: "center",
     marginBottom: getResponsiveSize(12),
@@ -171,7 +164,7 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     color: "#E0E0E0",
-    fontSize: getResponsiveSize(24),
+    fontSize: getResponsiveSize(36),
     fontFamily: "Rubik_400Regular",
     textAlign: "center",
     marginBottom: getResponsiveSize(16),
@@ -181,11 +174,11 @@ const styles = StyleSheet.create({
   },
   description: {
     color: "#B0B0B0",
-    fontSize: getResponsiveSize(16),
+    fontSize: getResponsiveSize(26),
     fontFamily: "Rubik_400Regular",
     textAlign: "center",
     marginTop: getResponsiveSize(8),
-    lineHeight: getResponsiveSize(24),
+    lineHeight: getResponsiveSize(36),
     paddingHorizontal: getResponsiveSize(20),
   },
   buttonContainer: {
@@ -195,11 +188,11 @@ const styles = StyleSheet.create({
   },
   button: {
     backgroundColor: "#5B2E91",
-    paddingVertical: getResponsiveSize(18),
+    paddingVertical: getResponsiveSize(28),
     paddingHorizontal: getResponsiveSize(100),
-    borderRadius: getResponsiveSize(30),
+    borderRadius: getResponsiveSize(40),
     width: "100%",
-    maxWidth: getResponsiveSize(400),
+    maxWidth: getResponsiveSize(500),
     alignItems: "center",
     justifyContent: "center",
     shadowColor: "#5B2E91",
@@ -221,20 +214,9 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: "#FFFFFF",
-    fontSize: getResponsiveSize(18),
+    fontSize: getResponsiveSize(28),
     fontWeight: "600",
     fontFamily: "Rubik_700Bold",
     letterSpacing: 0.5,
-  },
-  signInButton: {
-    marginTop: getResponsiveSize(16),
-    paddingVertical: getResponsiveSize(14),
-  },
-  signInButtonText: {
-    color: "#FFFFFF",
-    fontSize: getResponsiveSize(16),
-    fontFamily: "Rubik_400Regular",
-    textDecorationLine: "underline",
-    opacity: 0.9,
   },
 });
