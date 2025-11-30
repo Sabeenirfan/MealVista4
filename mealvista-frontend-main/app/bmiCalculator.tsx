@@ -19,9 +19,13 @@ export default function BMICalculatorScreen() {
   const isOnboarding = params.onboarding === 'true'; // Check if coming from signup flow
   const [height, setHeight] = useState("");
   const [weight, setWeight] = useState("");
+  const [heightFeet, setHeightFeet] = useState("");
+  const [heightInches, setHeightInches] = useState("");
   const [bmi, setBmi] = useState<number | null>(null);
   const [category, setCategory] = useState("Not calculated");
   const [color, setColor] = useState("#2b7fff");
+  const [heightUnit, setHeightUnit] = useState<"cm" | "ft">("cm");
+  const [weightUnit, setWeightUnit] = useState<"kg" | "lbs">("kg");
 
   useEffect(() => {
     const loadExistingData = async () => {
@@ -72,23 +76,120 @@ export default function BMICalculatorScreen() {
     }
   };
 
-  const handleCalculate = () => {
-    const heightNum = parseFloat(height);
-    const weightNum = parseFloat(weight);
+  const validateNumericInput = (input: string): boolean => {
+    // Check if input contains only numbers and optional decimal point
+    return /^\d*\.?\d*$/.test(input);
+  };
 
-    if (!height || !weight) {
-      Alert.alert("Error", "Please enter both height and weight");
+  const handleHeightChange = (text: string) => {
+    if (text === "" || validateNumericInput(text)) {
+      setHeight(text);
+      // Clear BMI when input changes
+      if (bmi !== null) {
+        setBmi(null);
+        setCategory("Not calculated");
+        setColor("#2b7fff");
+      }
+    }
+  };
+
+  const handleWeightChange = (text: string) => {
+    if (text === "" || validateNumericInput(text)) {
+      setWeight(text);
+      // Clear BMI when input changes
+      if (bmi !== null) {
+        setBmi(null);
+        setCategory("Not calculated");
+        setColor("#2b7fff");
+      }
+    }
+  };
+
+  const handleHeightFeetChange = (text: string) => {
+    if (text === "" || validateNumericInput(text)) {
+      setHeightFeet(text);
+      // Clear BMI when input changes
+      if (bmi !== null) {
+        setBmi(null);
+        setCategory("Not calculated");
+        setColor("#2b7fff");
+      }
+    }
+  };
+
+  const handleHeightInchesChange = (text: string) => {
+    if (text === "" || validateNumericInput(text)) {
+      setHeightInches(text);
+      // Clear BMI when input changes
+      if (bmi !== null) {
+        setBmi(null);
+        setCategory("Not calculated");
+        setColor("#2b7fff");
+      }
+    }
+  };
+
+  const convertToMetricHeight = (): number | null => {
+    if (heightUnit === "cm") {
+      const heightNum = parseFloat(height);
+      if (isNaN(heightNum) || heightNum <= 0) return null;
+      return heightNum;
+    } else {
+      // Convert feet and inches to cm
+      const feet = parseFloat(heightFeet);
+      const inches = parseFloat(heightInches);
+      if (isNaN(feet) && isNaN(inches)) return null;
+      const totalInches = (feet || 0) * 12 + (inches || 0);
+      if (totalInches <= 0) return null;
+      return totalInches * 2.54; // Convert inches to cm
+    }
+  };
+
+  const convertToMetricWeight = (): number | null => {
+    const weightNum = parseFloat(weight);
+    if (isNaN(weightNum) || weightNum <= 0) return null;
+    
+    if (weightUnit === "kg") {
+      return weightNum;
+    } else {
+      // Convert lbs to kg
+      return weightNum * 0.453592;
+    }
+  };
+
+  const handleCalculate = () => {
+    // Check if inputs are empty
+    if (heightUnit === "cm" && !height.trim()) {
+      Alert.alert("Error", "Please enter your height");
       return;
     }
 
-    if (heightNum <= 0 || weightNum <= 0) {
-      Alert.alert("Error", "Please enter valid values");
+    if (heightUnit === "ft" && !heightFeet.trim() && !heightInches.trim()) {
+      Alert.alert("Error", "Please enter your height");
+      return;
+    }
+
+    if (!weight.trim()) {
+      Alert.alert("Error", "Please enter your weight");
+      return;
+    }
+
+    const heightInCm = convertToMetricHeight();
+    const weightInKg = convertToMetricWeight();
+
+    if (!heightInCm) {
+      Alert.alert("Error", "Please enter valid height");
+      return;
+    }
+
+    if (!weightInKg) {
+      Alert.alert("Error", "Please enter valid weight");
       return;
     }
 
     // BMI = weight (kg) / (height (m))^2
-    const heightInMeters = heightNum / 100;
-    const calculatedBmi = weightNum / (heightInMeters * heightInMeters);
+    const heightInMeters = heightInCm / 100;
+    const calculatedBmi = weightInKg / (heightInMeters * heightInMeters);
 
     const { category: bmiCategory, color: bmiColor } =
       getBMICategory(calculatedBmi);
@@ -105,14 +206,17 @@ export default function BMICalculatorScreen() {
     }
     
     try {
-      // Save BMI data to backend
+      // Save BMI data to backend (always in metric)
+      const heightInCm = convertToMetricHeight();
+      const weightInKg = convertToMetricWeight();
+      
       await updateProfile({
-        height: parseFloat(height),
-        weight: parseFloat(weight),
+        height: heightInCm!,
+        weight: weightInKg!,
         bmi: bmi,
         bmiCategory: category
       });
-      console.log("BMI saved:", { height, weight, bmi, category });
+      console.log("BMI saved:", { height: heightInCm, weight: weightInKg, bmi, category });
       
       // If onboarding, go to next step (allergen preferences), otherwise go back to profile
       if (isOnboarding) {
@@ -200,31 +304,100 @@ export default function BMICalculatorScreen() {
 
           {/* Input Fields */}
           <View style={styles.inputsContainer}>
+            {/* Height Unit Toggle */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Height (cm)</Text>
-              <View style={styles.inputWrapper}>
-                <TextInput
-                  style={styles.input}
-                  placeholder="170"
-                  placeholderTextColor="#9CA3AF"
-                  keyboardType="numeric"
-                  value={height}
-                  onChangeText={setHeight}
-                />
+              <Text style={styles.label}>Height</Text>
+              <View style={styles.unitToggleContainer}>
+                <TouchableOpacity
+                  style={[styles.unitToggle, heightUnit === "cm" && styles.unitToggleActive]}
+                  onPress={() => setHeightUnit("cm")}
+                >
+                  <Text style={[styles.unitToggleText, heightUnit === "cm" && styles.unitToggleTextActive]}>
+                    CM
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.unitToggle, heightUnit === "ft" && styles.unitToggleActive]}
+                  onPress={() => setHeightUnit("ft")}
+                >
+                  <Text style={[styles.unitToggleText, heightUnit === "ft" && styles.unitToggleTextActive]}>
+                    FT/IN
+                  </Text>
+                </TouchableOpacity>
               </View>
+
+              {heightUnit === "cm" ? (
+                <View style={styles.inputWrapper}>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="170"
+                    placeholderTextColor="#9CA3AF"
+                    keyboardType="decimal-pad"
+                    value={height}
+                    onChangeText={handleHeightChange}
+                  />
+                  <Text style={styles.inputUnit}>cm</Text>
+                </View>
+              ) : (
+                <View style={styles.feetInchesContainer}>
+                  <View style={[styles.inputWrapper, { flex: 1 }]}>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="5"
+                      placeholderTextColor="#9CA3AF"
+                      keyboardType="decimal-pad"
+                      value={heightFeet}
+                      onChangeText={handleHeightFeetChange}
+                    />
+                    <Text style={styles.inputUnit}>ft</Text>
+                  </View>
+                  <View style={[styles.inputWrapper, { flex: 1 }]}>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="7"
+                      placeholderTextColor="#9CA3AF"
+                      keyboardType="decimal-pad"
+                      value={heightInches}
+                      onChangeText={handleHeightInchesChange}
+                    />
+                    <Text style={styles.inputUnit}>in</Text>
+                  </View>
+                </View>
+              )}
             </View>
 
+            {/* Weight Unit Toggle */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Weight (kg)</Text>
+              <Text style={styles.label}>Weight</Text>
+              <View style={styles.unitToggleContainer}>
+                <TouchableOpacity
+                  style={[styles.unitToggle, weightUnit === "kg" && styles.unitToggleActive]}
+                  onPress={() => setWeightUnit("kg")}
+                >
+                  <Text style={[styles.unitToggleText, weightUnit === "kg" && styles.unitToggleTextActive]}>
+                    KG
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.unitToggle, weightUnit === "lbs" && styles.unitToggleActive]}
+                  onPress={() => setWeightUnit("lbs")}
+                >
+                  <Text style={[styles.unitToggleText, weightUnit === "lbs" && styles.unitToggleTextActive]}>
+                    LBS
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
               <View style={styles.inputWrapper}>
                 <TextInput
                   style={styles.input}
-                  placeholder="65"
+                  placeholder={weightUnit === "kg" ? "65" : "143"}
                   placeholderTextColor="#9CA3AF"
-                  keyboardType="numeric"
+                  keyboardType="decimal-pad"
                   value={weight}
-                  onChangeText={setWeight}
+                  onChangeText={handleWeightChange}
                 />
+                <Text style={styles.inputUnit}>{weightUnit}</Text>
               </View>
             </View>
           </View>
@@ -383,13 +556,53 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     height: 48,
     paddingHorizontal: 12,
-    justifyContent: "center",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     borderWidth: 1,
     borderColor: "#E5E7EB",
   },
   input: {
     fontSize: 16,
     color: "#333333",
+    flex: 1,
+  },
+  inputUnit: {
+    fontSize: 14,
+    color: "#9CA3AF",
+    fontWeight: "500",
+    marginLeft: 8,
+  },
+  unitToggleContainer: {
+    flexDirection: "row",
+    backgroundColor: "#F5F5F7",
+    borderRadius: 14,
+    padding: 4,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  unitToggle: {
+    flex: 1,
+    paddingVertical: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 10,
+  },
+  unitToggleActive: {
+    backgroundColor: "#3C2253",
+  },
+  unitToggleText: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: "#4A5565",
+  },
+  unitToggleTextActive: {
+    color: "#FFFFFF",
+  },
+  feetInchesContainer: {
+    flexDirection: "row",
+    gap: 12,
   },
   calculateButton: {
     backgroundColor: "#3C2253",
