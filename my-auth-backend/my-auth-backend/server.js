@@ -55,6 +55,7 @@ const googleAuth = require('./routes/google');
 const adminRoutes = require('./routes/admin');
 const inventoryRoutes = require('./routes/inventory');
 const otpAuthRoutes = require('./routes/otp-auth');
+const recipesRoutes = require('./routes/recipes');
 
 // Use routes
 app.use('/api/auth', authRoutes);
@@ -62,6 +63,7 @@ app.use('/api/auth/google', googleAuth);
 app.use('/api/admin', adminRoutes);
 app.use('/api/admin/inventory', inventoryRoutes);
 app.use('/api/otp-auth', otpAuthRoutes); // New OTP-based auth routes
+app.use('/api/recipes', recipesRoutes); // Recipes API
 
 app.get('/', (req, res) => {
   res.json({ 

@@ -368,7 +368,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   verifyButton: {
-    backgroundColor: '#667eea',
+    backgroundColor: "#3C2253",
     paddingVertical: 16,
     paddingHorizontal: 60,
     borderRadius: 12,

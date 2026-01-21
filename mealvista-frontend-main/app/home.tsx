@@ -7,11 +7,14 @@ import {
   TouchableOpacity,
   StyleSheet,
   StatusBar,
+  ActivityIndicator,
 } from 'react-native';
 import { Feather } from "@expo/vector-icons";
 import { useFavorites } from "../contexts/FavoritesContext";
 import { useRouter } from 'expo-router';
 import { useCart } from '../contexts/CartContext';
+import axios from 'axios';
+import { useState, useEffect } from 'react';
 
 interface Meal {
   image: string;
@@ -22,6 +25,7 @@ interface Meal {
   rating: number;
   trending?: boolean;
   featured?: boolean;
+  category?: string;
 }
 
 interface MealCardProps {
@@ -30,6 +34,12 @@ interface MealCardProps {
   onPress?: () => void;
   onBookmarkPress?: () => void;
   favorited?: boolean;
+}
+
+interface Category {
+  id: string;
+  name: string;
+  color: string;
 }
 
 const MealCard = ({ meal, size = 'normal', onPress, onBookmarkPress, favorited = false }: MealCardProps) => {
@@ -100,11 +110,22 @@ export default function Home() {
   const router = useRouter();
   const { getTotalItems } = useCart();
   const { favorites, toggleFavorite, isFavorited } = useFavorites();
+  const [selectedCategory, setSelectedCategory] = useState<string>('Mediterranean');
+
+  const categories: Category[] = [
+    { id: 'pakistani', name: 'Pakistani', color: '#1F4788' },
+    { id: 'italian', name: 'Italian', color: '#E8472B' },
+    { id: 'chinese', name: 'Chinese', color: '#DE2910' },
+    { id: 'mexican', name: 'Mexican', color: '#CE1126' },
+    { id: 'thai', name: 'Thai', color: '#2D5016' },
+    { id: 'mediterranean', name: 'Mediterranean', color: '#FF9500' },
+  ];
 
   const recommendedMeals: Meal[] = [
     {
       image: "https://images.unsplash.com/photo-1687276287139-88f7333c8ca4?w=400",
-      title: "Avocado Toast Deluxe",
+      title: "Hummus",
+      category: "Mediterranean",
       time: 10,
       calories: 320,
       difficulty: "Easy",
@@ -112,24 +133,27 @@ export default function Home() {
     },
     {
       image: "https://images.unsplash.com/photo-1609461098241-8f259e32bdb9?w=400",
-      title: "Mediterranean Bowl",
-      time: 15,
+      title: "Falafel",
+      category: "Mediterranean",
+      time: 25,
       calories: 450,
       difficulty: "Medium",
       rating: 4.9,
     },
     {
       image: "https://images.unsplash.com/photo-1623428187969-5da2dcea5ebf?w=400",
-      title: "Quinoa Power Salad",
-      time: 20,
+      title: "Greek Salad",
+      category: "Mediterranean",
+      time: 15,
       calories: 380,
       difficulty: "Easy",
       rating: 4.5,
     },
     {
       image: "https://images.unsplash.com/photo-1612152328178-4a6c83d96429?w=400",
-      title: "Chicken Broccoli Pasta",
-      time: 25,
+      title: "Shawarma",
+      category: "Mediterranean",
+      time: 30,
       calories: 520,
       difficulty: "Medium",
       rating: 4.8,
@@ -139,7 +163,8 @@ export default function Home() {
   const trendingMeals: Meal[] = [
     {
       image: "https://images.unsplash.com/photo-1476718406336-bb5a9690ee2a?w=800",
-      title: "Creamy Pumpkin Soup",
+      title: "Moussaka",
+      category: "Mediterranean",
       time: 35,
       calories: 290,
       difficulty: "Medium",
@@ -149,7 +174,8 @@ export default function Home() {
     },
     {
       image: "https://images.unsplash.com/photo-1664741662725-bd131742b7b7?w=400",
-      title: "Winter Beef Stew",
+      title: "Lamb Kebab",
+      category: "Mediterranean",
       time: 45,
       calories: 465,
       difficulty: "Hard",
@@ -158,7 +184,8 @@ export default function Home() {
     },
     {
       image: "https://images.unsplash.com/photo-1606890737304-57a1ca8a5b62?w=400",
-      title: "Chocolate Layer Cake",
+      title: "Baklava",
+      category: "Mediterranean",
       time: 60,
       calories: 380,
       difficulty: "Hard",
@@ -166,6 +193,14 @@ export default function Home() {
       trending: true,
     },
   ];
+
+  const filteredRecommendedMeals = recommendedMeals.filter(
+    meal => !selectedCategory || meal.category?.toLowerCase() === selectedCategory.toLowerCase()
+  );
+
+  const filteredTrendingMeals = trendingMeals.filter(
+    meal => !selectedCategory || meal.category?.toLowerCase() === selectedCategory.toLowerCase()
+  );
 
   const handleMealPress = (meal: Meal) => {
     router.push({
@@ -230,15 +265,65 @@ export default function Home() {
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}
       >
+        {/* Search Bar */}
+        <View style={styles.searchBarContainer}>
+          <TouchableOpacity 
+            style={styles.searchBarInput}
+            onPress={() => router.push('/home')}
+          >
+            <Text style={styles.searchBarPlaceholder}>Search recipes...</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.searchBarButton}
+            onPress={() => router.push('/home')}
+          >
+            <Text style={styles.searchBarIcon}>🔍</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Categories Section */}
+        <View style={styles.categoriesSection}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.categoriesScrollView}
+            contentContainerStyle={styles.categoriesContainer}
+          >
+            {categories.map((category) => (
+              <TouchableOpacity
+                key={category.id}
+                onPress={() => setSelectedCategory(category.name)}
+                activeOpacity={0.8}
+                style={[
+                  styles.categoryPill,
+                  selectedCategory === category.name && [
+                    styles.categoryPillActive,
+                    { backgroundColor: category.color }
+                  ]
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.categoryPillText,
+                    selectedCategory === category.name && styles.categoryPillTextActive
+                  ]}
+                >
+                  {category.name}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+
         {/* Recommended Section */}
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Recommended for You</Text>
           <Text style={styles.sectionSubtitle}>
-            A curated based on your preferences
+            A curated selection from {selectedCategory}
           </Text>
         </View>
         <View style={styles.gridContainer}>
-          {recommendedMeals.map((meal, index) => {
+          {filteredRecommendedMeals.map((meal, index) => {
             const id = (meal as any).id ?? meal.title.replace(/\s+/g, '-').toLowerCase();
             const mealWithId = { ...(meal as any), id } as Meal & { id: string };
             return (
@@ -262,25 +347,27 @@ export default function Home() {
           </View>
         </View>
         {/* Featured Trending Meal */}
-        <View style={styles.featuredContainer}>
-          {(() => {
-            const meal = trendingMeals[0];
-            const id = (meal as any).id ?? meal.title.replace(/\s+/g, '-').toLowerCase();
-            const mealWithId = { ...(meal as any), id } as Meal & { id: string };
-            return (
-              <MealCard
-                meal={mealWithId}
-                size="large"
-                onPress={() => handleMealPress(mealWithId)}
-                onBookmarkPress={() => handleBookmarkPress(mealWithId)}
-                favorited={isFavorited(id)}
-              />
-            );
-          })()}
-        </View>
+        {filteredTrendingMeals.length > 0 && (
+          <View style={styles.featuredContainer}>
+            {(() => {
+              const meal = filteredTrendingMeals[0];
+              const id = (meal as any).id ?? meal.title.replace(/\s+/g, '-').toLowerCase();
+              const mealWithId = { ...(meal as any), id } as Meal & { id: string };
+              return (
+                <MealCard
+                  meal={mealWithId}
+                  size="large"
+                  onPress={() => handleMealPress(mealWithId)}
+                  onBookmarkPress={() => handleBookmarkPress(mealWithId)}
+                  favorited={isFavorited(id)}
+                />
+              );
+            })()}
+          </View>
+        )}
         {/* Other Trending Meals */}
         <View style={styles.gridContainer}>
-          {trendingMeals.slice(1).map((meal, index) => {
+          {filteredTrendingMeals.slice(1).map((meal, index) => {
             const id = (meal as any).id ?? meal.title.replace(/\s+/g, '-').toLowerCase();
             const mealWithId = { ...(meal as any), id } as Meal & { id: string };
             return (
@@ -357,6 +444,77 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
+  },
+  searchBarContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    backgroundColor: '#3C2253',
+    gap: 10,
+  },
+  searchBarInput: {
+    flex: 1,
+    borderWidth: 2,
+    borderColor: '#fff',
+    borderRadius: 30,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    backgroundColor: '#fff',
+    justifyContent: 'center',
+  },
+  searchBarPlaceholder: {
+    fontSize: 16,
+    color: '#999',
+  },
+  searchBarButton: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#000',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  searchBarIcon: {
+    fontSize: 24,
+    color: '#fff',
+  },
+  categoriesSection: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#F9FAFB',
+  },
+  categoriesScrollView: {
+    flexGrow: 0,
+  },
+  categoriesContainer: {
+    paddingEnd: 16,
+    gap: 10,
+  },
+  categoryPill: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 24,
+    backgroundColor: '#E5E7EB',
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+  },
+  categoryPillActive: {
+    backgroundColor: '#FF9500',
+    borderColor: '#FF9500',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+  },
+  categoryPillText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  categoryPillTextActive: {
+    color: '#fff',
   },
   sectionHeader: {
     backgroundColor: '#3C2253',

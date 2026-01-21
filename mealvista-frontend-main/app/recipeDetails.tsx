@@ -35,16 +35,25 @@ export default function RecipeDetails() {
     rating: params.mealRating as string || '4.8',
   };
 
-  const ingredientsList: Ingredient[] = [
-    { id: '1', name: 'Pumpkin Puree', category: 'Canned Goods', price: 3.99 },
-    { id: '2', name: 'Onion', category: 'Vegetables', price: 1.49 },
-    { id: '3', name: 'Garlic', category: 'Vegetables', price: 0.99 },
-    { id: '4', name: 'Vegetable Broth', category: 'Canned Goods', price: 2.99 },
-    { id: '5', name: 'Heavy Cream', category: 'Dairy', price: 4.99 },
-    { id: '6', name: 'Ground Cinnamon', category: 'Spices', price: 2.49 },
-    { id: '7', name: 'Nutmeg', category: 'Spices', price: 2.99 },
-    { id: '8', name: 'Olive Oil', category: 'Oils', price: 5.99 },
-  ];
+  // Use ingredients passed via params (from backend) when available
+  const passedIngredientsRaw = params.ingredients as string | undefined;
+  const ingredientsList: Ingredient[] = passedIngredientsRaw
+    ? JSON.parse(passedIngredientsRaw).map((name: string, i: number) => ({
+        id: String(i + 1),
+        name,
+        category: 'Pantry',
+        price: 0,
+      }))
+    : [
+        { id: '1', name: 'Pumpkin Puree', category: 'Canned Goods', price: 3.99 },
+        { id: '2', name: 'Onion', category: 'Vegetables', price: 1.49 },
+        { id: '3', name: 'Garlic', category: 'Vegetables', price: 0.99 },
+        { id: '4', name: 'Vegetable Broth', category: 'Canned Goods', price: 2.99 },
+        { id: '5', name: 'Heavy Cream', category: 'Dairy', price: 4.99 },
+        { id: '6', name: 'Ground Cinnamon', category: 'Spices', price: 2.49 },
+        { id: '7', name: 'Nutmeg', category: 'Spices', price: 2.99 },
+        { id: '8', name: 'Olive Oil', category: 'Oils', price: 5.99 },
+      ];
 
   const handleToggleIngredient = (id: string) => {
     setSelectedIngredients((prev) =>
@@ -100,12 +109,10 @@ export default function RecipeDetails() {
   };
 
   const handleViewNutrients = () => {
-    router.push({
-      pathname: '/nutritionalBreakdown',
-      params: {
-        mealTitle: meal.title,
-      },
-    });
+    const paramsToSend: any = { mealTitle: meal.title };
+    if (params.macros) paramsToSend.macros = params.macros;
+    if (params.micros) paramsToSend.micros = params.micros;
+    router.push({ pathname: '/nutritionalBreakdown', params: paramsToSend });
   };
 
   const handleViewAllergens = () => {

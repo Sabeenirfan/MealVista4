@@ -14,25 +14,29 @@ export default function NutritionalBreakdown() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const mealTitle = params.mealTitle as string || 'Creamy Pumpkin Soup';
-
   const handleViewMacronutrients = () => {
-    router.push({
-      pathname: '/macronutrients',
-      params: {
-        mealTitle: mealTitle,
-      },
-    });
+    router.push({ pathname: '/macronutrients', params: { mealTitle } });
   };
 
-  // Match the exact values from the screenshot
-  const nutritionData = {
-    calories: 290,
-    protein: 8,
-    carbs: 42,
-    fat: 12,
-    fiber: 5,
-    sugar: 8,
-  };
+  // If macros were passed via params, use them; otherwise fall back to defaults
+  const passedMacros = params.macros ? JSON.parse(params.macros as string) : null;
+  const nutritionData = passedMacros
+    ? {
+        calories: Number(params.mealCalories) || Math.round((passedMacros.protein || 0) * 4 + (passedMacros.carbs || 0) * 4 + (passedMacros.fat || 0) * 9),
+        protein: passedMacros.protein || 0,
+        carbs: passedMacros.carbs || 0,
+        fat: passedMacros.fat || 0,
+        fiber: passedMacros.fiber || 0,
+        sugar: 0,
+      }
+    : {
+        calories: 290,
+        protein: 8,
+        carbs: 42,
+        fat: 12,
+        fiber: 5,
+        sugar: 8,
+      };
 
   return (
     <View style={styles.container}>
