@@ -218,9 +218,9 @@ export default function BMICalculatorScreen() {
       });
       console.log("BMI saved:", { height: heightInCm, weight: weightInKg, bmi, category });
       
-      // If onboarding, go to next step (allergen preferences), otherwise go back to profile
+      // If onboarding, go to next step (health goal), otherwise go back to profile
       if (isOnboarding) {
-        router.push({ pathname: "/allergenPreference", params: { onboarding: 'true' } } as any);
+        router.push({ pathname: "/healthGoal", params: { onboarding: 'true' } } as any);
       } else {
         // Show success message and go back to profile
         Alert.alert(

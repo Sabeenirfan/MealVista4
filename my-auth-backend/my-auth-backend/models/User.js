@@ -64,6 +64,11 @@ const userSchema = new mongoose.Schema({
     type: String,
     default: null
   },
+  healthGoal: {
+    type: String,
+    enum: ['weight_loss', 'weight_gain', 'maintenance'],
+    default: null
+  },
   isDeleted: {
     type: Boolean,
     default: false

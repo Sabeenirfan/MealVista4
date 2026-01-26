@@ -14,22 +14,61 @@ export default function Macronutrients() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const mealTitle = params.mealTitle as string || 'Creamy Pumpkin Soup';
+  
+  // Parse macros from params
+  let macrosData: any = {};
+  try {
+    macrosData = params.macros ? JSON.parse(params.macros as string) : {};
+  } catch (e) {
+    console.error('Error parsing macros:', e);
+  }
 
   const handleViewMicronutrients = () => {
     router.push({
       pathname: '/micronutrients',
       params: {
         mealTitle: mealTitle,
+        micros: params.micros as string || '{}',
       },
     });
   };
 
-  // Match exact values from screenshot
+  // Calculate total calories from macros
+  const totalCalories = (macrosData.protein || 0) * 4 + (macrosData.carbs || 0) * 4 + (macrosData.fat || 0) * 9;
+  const proteinCalories = (macrosData.protein || 0) * 4;
+  const carbsCalories = (macrosData.carbs || 0) * 4;
+  const fatCalories = (macrosData.fat || 0) * 9;
+  const fiberCalories = (macrosData.fiber || 0) * 2;
+
   const macronutrients = [
-    { name: 'Protein', value: 8, unit: 'g', color: '#3B82F6', percentage: 11 },
-    { name: 'Carbohydrates', value: 42, unit: 'g', color: '#10B981', percentage: 58 },
-    { name: 'Fat', value: 12, unit: 'g', color: '#F59E0B', percentage: 37 },
-    { name: 'Fiber', value: 5, unit: 'g', color: '#8B5CF6', percentage: 7 },
+    { 
+      name: 'Protein', 
+      value: macrosData.protein || 8, 
+      unit: 'g', 
+      color: '#3B82F6', 
+      percentage: totalCalories > 0 ? Math.round((proteinCalories / totalCalories) * 100) : 11 
+    },
+    { 
+      name: 'Carbohydrates', 
+      value: macrosData.carbs || 42, 
+      unit: 'g', 
+      color: '#10B981', 
+      percentage: totalCalories > 0 ? Math.round((carbsCalories / totalCalories) * 100) : 58 
+    },
+    { 
+      name: 'Fat', 
+      value: macrosData.fat || 12, 
+      unit: 'g', 
+      color: '#F59E0B', 
+      percentage: totalCalories > 0 ? Math.round((fatCalories / totalCalories) * 100) : 37 
+    },
+    { 
+      name: 'Fiber', 
+      value: macrosData.fiber || 5, 
+      unit: 'g', 
+      color: '#8B5CF6', 
+      percentage: totalCalories > 0 ? Math.round((fiberCalories / totalCalories) * 100) : 7 
+    },
   ];
 
   return (

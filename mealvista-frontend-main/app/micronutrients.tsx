@@ -14,17 +14,84 @@ export default function Micronutrients() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const mealTitle = params.mealTitle as string || 'Creamy Pumpkin Soup';
+  
+  // Parse micros from params
+  let microsData: any = {};
+  try {
+    microsData = params.micros ? JSON.parse(params.micros as string) : {};
+  } catch (e) {
+    console.error('Error parsing micros:', e);
+  }
 
-  // Match values from screenshot
+  // Daily recommended values
+  const dailyValues: { [key: string]: number } = {
+    vitaminA: 900, // IU
+    vitaminC: 90, // mg
+    calcium: 1000, // mg
+    iron: 18, // mg
+    vitaminD: 600, // IU
+    potassium: 3500, // mg
+    magnesium: 400, // mg
+    zinc: 11, // mg
+  };
+
   const micronutrients = [
-    { name: 'Vitamin A', value: 850, unit: 'IU', dailyValue: 900, percentage: 94 },
-    { name: 'Vitamin C', value: 45, unit: 'mg', dailyValue: 90, percentage: 50 },
-    { name: 'Calcium', value: 200, unit: 'mg', dailyValue: 1000, percentage: 20 },
-    { name: 'Iron', value: 3.5, unit: 'mg', dailyValue: 18, percentage: 19 },
-    { name: 'Vitamin D', value: 120, unit: 'IU', dailyValue: 600, percentage: 20 },
-    { name: 'Potassium', value: 350, unit: 'mg', dailyValue: 3500, percentage: 10 },
-    { name: 'Magnesium', value: 50, unit: 'mg', dailyValue: 400, percentage: 13 },
-    { name: 'Zinc', value: 2.5, unit: 'mg', dailyValue: 11, percentage: 23 },
+    { 
+      name: 'Vitamin A', 
+      value: microsData.vitaminA || 850, 
+      unit: 'IU', 
+      dailyValue: dailyValues.vitaminA, 
+      percentage: Math.round(((microsData.vitaminA || 850) / dailyValues.vitaminA) * 100) 
+    },
+    { 
+      name: 'Vitamin C', 
+      value: microsData.vitaminC || 45, 
+      unit: 'mg', 
+      dailyValue: dailyValues.vitaminC, 
+      percentage: Math.round(((microsData.vitaminC || 45) / dailyValues.vitaminC) * 100) 
+    },
+    { 
+      name: 'Calcium', 
+      value: microsData.calcium || 200, 
+      unit: 'mg', 
+      dailyValue: dailyValues.calcium, 
+      percentage: Math.round(((microsData.calcium || 200) / dailyValues.calcium) * 100) 
+    },
+    { 
+      name: 'Iron', 
+      value: microsData.iron || 3.5, 
+      unit: 'mg', 
+      dailyValue: dailyValues.iron, 
+      percentage: Math.round(((microsData.iron || 3.5) / dailyValues.iron) * 100) 
+    },
+    { 
+      name: 'Vitamin D', 
+      value: microsData.vitaminD || 120, 
+      unit: 'IU', 
+      dailyValue: dailyValues.vitaminD, 
+      percentage: Math.round(((microsData.vitaminD || 120) / dailyValues.vitaminD) * 100) 
+    },
+    { 
+      name: 'Potassium', 
+      value: microsData.potassium || 350, 
+      unit: 'mg', 
+      dailyValue: dailyValues.potassium, 
+      percentage: Math.round(((microsData.potassium || 350) / dailyValues.potassium) * 100) 
+    },
+    { 
+      name: 'Magnesium', 
+      value: microsData.magnesium || 50, 
+      unit: 'mg', 
+      dailyValue: dailyValues.magnesium, 
+      percentage: Math.round(((microsData.magnesium || 50) / dailyValues.magnesium) * 100) 
+    },
+    { 
+      name: 'Zinc', 
+      value: microsData.zinc || 2.5, 
+      unit: 'mg', 
+      dailyValue: dailyValues.zinc, 
+      percentage: Math.round(((microsData.zinc || 2.5) / dailyValues.zinc) * 100) 
+    },
   ];
 
   return (

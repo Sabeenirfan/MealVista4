@@ -4,6 +4,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import api from '../../../lib/api';
 
 const COLORS = {
   primary: '#3C2253',
@@ -59,13 +60,12 @@ export default function BulkImageUpload() {
         if (!itemName || !imageUrl) continue;
 
         try {
-          const response = await fetch('http://192.168.56.1:5000/api/inventory/update-image', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ itemName, imageUrl })
+          const response = await api.post('/api/inventory/update-image', {
+            itemName,
+            imageUrl
           });
 
-          if (response.ok) {
+          if (response.status === 200 || response.status === 201) {
             updated++;
           } else {
             failed++;

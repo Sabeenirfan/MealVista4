@@ -321,6 +321,14 @@ export default function ProfileScreen() {
             <Ionicons name="chevron-forward" size={20} color="#6B7280" />
           </TouchableOpacity>
 
+          <TouchableOpacity style={styles.optionItem} onPress={() => router.push('/healthGoal')}>
+            <View style={styles.optionLeft}>
+              <Ionicons name="flag" size={20} color="#3C2253" />
+              <Text style={styles.optionText}>Set Health Goal</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="#6B7280" />
+          </TouchableOpacity>
+
           <TouchableOpacity style={styles.optionItem} onPress={() => router.push('/favorites')}>
             <View style={styles.optionLeft}>
               <Ionicons name="heart" size={20} color="#3C2253" />

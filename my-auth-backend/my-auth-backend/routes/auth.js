@@ -213,7 +213,7 @@ router.get('/me', auth, async (req, res) => {
 // UPDATE PROFILE
 router.put('/me', auth, async (req, res) => {
   try {
-    const { name, email, dietaryPreferences, allergens, height, weight, bmi, bmiCategory } = req.body;
+    const { name, email, dietaryPreferences, allergens, height, weight, bmi, bmiCategory, healthGoal } = req.body;
 
     const user = await User.findOne({ _id: req.userId, isDeleted: { $ne: true } });
     if (!user) {
@@ -281,6 +281,14 @@ router.put('/me', auth, async (req, res) => {
     // Update BMI category if provided
     if (bmiCategory !== undefined) {
       user.bmiCategory = bmiCategory || null;
+    }
+
+    // Update health goal if provided
+    if (healthGoal !== undefined) {
+      if (healthGoal && !['weight_loss', 'weight_gain', 'maintenance'].includes(healthGoal)) {
+        return res.status(400).json({ message: 'Invalid health goal. Must be weight_loss, weight_gain, or maintenance' });
+      }
+      user.healthGoal = healthGoal || null;
     }
 
     await user.save();

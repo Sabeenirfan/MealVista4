@@ -22,6 +22,7 @@ const CookingInstructionsScreen: React.FC = () => {
   const router = useRouter();
   const params = useLocalSearchParams();
   const mealTitle = params.mealTitle as string || "Recipe";
+  const mealImage = params.mealImage as string || "https://images.unsplash.com/photo-1621996346565-e3dbc646d9a9?w=800";
   const [checkedSteps, setCheckedSteps] = useState<CheckedSteps>({});
   const [currentStep, setCurrentStep] = useState(0);
   const [isReading, setIsReading] = useState(false);
@@ -30,32 +31,28 @@ const CookingInstructionsScreen: React.FC = () => {
   const [allStepsComplete, setAllStepsComplete] = useState(false);
   const [isListening, setIsListening] = useState(false);
 
-  const instructions = [
+  // Parse instructions from params
+  let instructionsData: any[] = [];
+  try {
+    instructionsData = params.instructions ? JSON.parse(params.instructions as string) : [];
+  } catch (e) {
+    console.error('Error parsing instructions:', e);
+  }
+
+  // Use instructions from API or fallback
+  const instructions = instructionsData.length > 0 ? instructionsData : [
     {
       id: 1,
-      text: "Bring a large pot of salted water to boil and add pasta. Cook according to package directions until al dente.",
-      time: "8-10 minutes",
-      note: "Use salt the water generously - it should taste like sea water",
+      text: "Prepare all ingredients as listed",
+      time: "5 minutes",
     },
     {
       id: 2,
-      text: "Heat olive oil in a large skillet and cook chicken breast until golden brown.",
-      details: [
-        "Heat olive oil in a large skillet or pan over medium high heat",
-        "Season chicken breast with salt and pepper and add to the hot pan. Cook and golden brown on both sides",
-      ],
+      text: "Follow the cooking method for this dish",
     },
     {
       id: 3,
-      text: "Add broccoli florets to the pan with chicken. Stir and cook until broccoli is tender crisp",
-    },
-    {
-      id: 4,
-      text: "Drain pasta and add it to the pan. Toss everything together and season with more salt, pepper, and parmesan cheese",
-    },
-    {
-      id: 5,
-      text: "Serve immediately while hot, garnished with fresh herbs and extra parmesan if desired.",
+      text: "Season to taste and serve hot",
     },
   ];
 
@@ -217,7 +214,7 @@ const CookingInstructionsScreen: React.FC = () => {
         <View style={styles.recipeCard}>
           <Image
             source={{
-              uri: "https://images.unsplash.com/photo-1621996346565-e3dbc646d9a9?w=800",
+              uri: mealImage,
             }}
             style={styles.recipeImage}
           />

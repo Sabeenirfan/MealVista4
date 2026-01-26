@@ -14,6 +14,7 @@ export interface AuthUser {
   weight?: number;
   bmi?: number;
   bmiCategory?: string;
+  healthGoal?: 'weight_loss' | 'weight_gain' | 'maintenance';
 }
 
 export interface User {
@@ -132,6 +133,7 @@ export const updateProfile = async (data: {
   weight?: number;
   bmi?: number;
   bmiCategory?: string;
+  healthGoal?: 'weight_loss' | 'weight_gain' | 'maintenance';
 }): Promise<ProfileResponse> => {
   try {
     const response = await api.put<ProfileResponse>('/api/auth/me', data);

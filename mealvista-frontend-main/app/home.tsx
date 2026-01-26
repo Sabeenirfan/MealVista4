@@ -13,10 +13,11 @@ import { Feather } from "@expo/vector-icons";
 import { useFavorites } from "../contexts/FavoritesContext";
 import { useRouter } from 'expo-router';
 import { useCart } from '../contexts/CartContext';
-import axios from 'axios';
+import api from '../lib/api';
 import { useState, useEffect } from 'react';
 
 interface Meal {
+  id?: string;
   image: string;
   title: string;
   time: number;
@@ -26,6 +27,7 @@ interface Meal {
   trending?: boolean;
   featured?: boolean;
   category?: string;
+  recipeData?: any;
 }
 
 interface MealCardProps {
@@ -110,7 +112,9 @@ export default function Home() {
   const router = useRouter();
   const { getTotalItems } = useCart();
   const { favorites, toggleFavorite, isFavorited } = useFavorites();
-  const [selectedCategory, setSelectedCategory] = useState<string>('Mediterranean');
+  const [selectedCategory, setSelectedCategory] = useState<string>('Pakistani');
+  const [recipes, setRecipes] = useState<Meal[]>([]);
+  const [loading, setLoading] = useState(false);
 
   const categories: Category[] = [
     { id: 'pakistani', name: 'Pakistani', color: '#1F4788' },
@@ -121,88 +125,109 @@ export default function Home() {
     { id: 'mediterranean', name: 'Mediterranean', color: '#FF9500' },
   ];
 
-  const recommendedMeals: Meal[] = [
-    {
-      image: "https://images.unsplash.com/photo-1687276287139-88f7333c8ca4?w=400",
-      title: "Hummus",
-      category: "Mediterranean",
-      time: 10,
-      calories: 320,
-      difficulty: "Easy",
-      rating: 4.7,
-    },
-    {
-      image: "https://images.unsplash.com/photo-1609461098241-8f259e32bdb9?w=400",
-      title: "Falafel",
-      category: "Mediterranean",
-      time: 25,
-      calories: 450,
-      difficulty: "Medium",
-      rating: 4.9,
-    },
-    {
-      image: "https://images.unsplash.com/photo-1623428187969-5da2dcea5ebf?w=400",
-      title: "Greek Salad",
-      category: "Mediterranean",
-      time: 15,
-      calories: 380,
-      difficulty: "Easy",
-      rating: 4.5,
-    },
-    {
-      image: "https://images.unsplash.com/photo-1612152328178-4a6c83d96429?w=400",
-      title: "Shawarma",
-      category: "Mediterranean",
-      time: 30,
-      calories: 520,
-      difficulty: "Medium",
-      rating: 4.8,
-    },
-  ];
+  // Fetch recipes from API when category changes
+  useEffect(() => {
+    fetchRecipes();
+  }, [selectedCategory]);
 
-  const trendingMeals: Meal[] = [
-    {
-      image: "https://images.unsplash.com/photo-1476718406336-bb5a9690ee2a?w=800",
-      title: "Moussaka",
-      category: "Mediterranean",
-      time: 35,
-      calories: 290,
-      difficulty: "Medium",
-      rating: 4.8,
-      trending: true,
-      featured: true,
-    },
-    {
-      image: "https://images.unsplash.com/photo-1664741662725-bd131742b7b7?w=400",
-      title: "Lamb Kebab",
-      category: "Mediterranean",
-      time: 45,
-      calories: 465,
-      difficulty: "Hard",
-      rating: 4.6,
-      trending: true,
-    },
-    {
-      image: "https://images.unsplash.com/photo-1606890737304-57a1ca8a5b62?w=400",
-      title: "Baklava",
-      category: "Mediterranean",
-      time: 60,
-      calories: 380,
-      difficulty: "Hard",
-      rating: 4.8,
-      trending: true,
-    },
-  ];
+  const fetchRecipes = async () => {
+    try {
+      setLoading(true);
+      const categoryMap: { [key: string]: string } = {
+        'Pakistani': 'pakistani',
+        'Italian': 'italian',
+        'Chinese': 'chinese',
+        'Mexican': 'mexican',
+        'Thai': 'thai',
+        'Mediterranean': 'mediterranean',
+      };
+      
+      const apiCategory = categoryMap[selectedCategory] || selectedCategory.toLowerCase();
+      console.log(`[Home] Fetching recipes for category: ${selectedCategory} -> ${apiCategory}`);
+      
+      const response = await api.get(`/api/recipes/category/${apiCategory}`);
+      console.log(`[Home] API Response status:`, response.status);
+      console.log(`[Home] API Response data:`, JSON.stringify(response.data).substring(0, 200));
+      console.log(`[Home] Success:`, response.data?.success, 'Recipes count:', response.data?.recipes?.length);
+      
+      if (response && response.data && response.data.success === true) {
+        const recipesData = response.data.recipes || [];
+        console.log(`[Home] Received ${recipesData.length} recipes from API`);
+        
+        if (recipesData && recipesData.length > 0) {
+          const fetchedRecipes: Meal[] = recipesData
+            .map((recipe: any, idx: number) => {
+              try {
+                if (!recipe) {
+                  console.warn(`[Home] Recipe at index ${idx} is null/undefined`);
+                  return null;
+                }
+                if (!recipe.id && !recipe.name) {
+                  console.warn(`[Home] Recipe at index ${idx} missing id and name:`, recipe);
+                  return null;
+                }
+                
+                const meal: Meal = {
+                  id: recipe.id || `recipe-${idx}`,
+                  image: recipe.image || 'https://via.placeholder.com/400',
+                  title: recipe.name || recipe.title || 'Unknown Recipe',
+                  category: selectedCategory,
+                  time: (recipe.prepTime || 0) + (recipe.cookTime || 0) || 30,
+                  calories: recipe.calories || 250,
+                  difficulty: recipe.difficulty || 'Medium',
+                  rating: parseFloat(recipe.rating) || 4.5,
+                  trending: false,
+                  featured: false,
+                  recipeData: recipe,
+                };
+                console.log(`[Home] Processed recipe ${idx + 1}: ${meal.title}`);
+                return meal;
+              } catch (err) {
+                console.error(`[Home] Error processing recipe at index ${idx}:`, err);
+                return null;
+              }
+            })
+            .filter((meal: Meal | null) => meal !== null) as Meal[];
+          
+          console.log(`[Home] Successfully processed ${fetchedRecipes.length} recipes out of ${recipesData.length}`);
+          if (fetchedRecipes.length > 0) {
+            setRecipes(fetchedRecipes);
+          } else {
+            console.error('[Home] All recipes were filtered out!');
+            setRecipes([]);
+          }
+        } else {
+          console.warn('[Home] Recipes array is empty or null');
+          setRecipes([]);
+        }
+      } else {
+        console.error('[Home] API response not successful:', {
+          hasResponse: !!response,
+          hasData: !!response?.data,
+          success: response?.data?.success,
+          message: response?.data?.message,
+        });
+        setRecipes([]);
+      }
+    } catch (error: any) {
+      console.error('Error fetching recipes:', error);
+      console.error('Error details:', error.response?.data || error.message);
+      // Keep empty array on error
+      setRecipes([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  const filteredRecommendedMeals = recommendedMeals.filter(
-    meal => !selectedCategory || meal.category?.toLowerCase() === selectedCategory.toLowerCase()
-  );
-
-  const filteredTrendingMeals = trendingMeals.filter(
-    meal => !selectedCategory || meal.category?.toLowerCase() === selectedCategory.toLowerCase()
-  );
+  const recommendedMeals = recipes.slice(0, 4);
+  const trendingMeals = recipes.slice(4, 8).map((meal, index) => ({
+    ...meal,
+    trending: true,
+    featured: index === 0,
+  }));
 
   const handleMealPress = (meal: Meal) => {
+    const recipeData = (meal as any).recipeData;
     router.push({
       pathname: '/recipeDetails',
       params: {
@@ -212,6 +237,13 @@ export default function Home() {
         mealCalories: meal.calories.toString(),
         mealDifficulty: meal.difficulty,
         mealRating: meal.rating.toString(),
+        // Pass full recipe data
+        recipeId: recipeData?.id || '',
+        ingredients: recipeData ? JSON.stringify(recipeData.ingredients || []) : '[]',
+        instructions: recipeData ? JSON.stringify(recipeData.instructions || []) : '[]',
+        macros: recipeData ? JSON.stringify(recipeData.macros || {}) : '{}',
+        micros: recipeData ? JSON.stringify(recipeData.micros || {}) : '{}',
+        allergens: recipeData ? JSON.stringify(recipeData.allergens || []) : '[]',
       },
     });
   };
@@ -269,13 +301,13 @@ export default function Home() {
         <View style={styles.searchBarContainer}>
           <TouchableOpacity 
             style={styles.searchBarInput}
-            onPress={() => router.push('/home')}
+            onPress={() => router.push('/search')}
           >
-            <Text style={styles.searchBarPlaceholder}>Search recipes...</Text>
+            <Text style={styles.searchBarPlaceholder}>Search AI recipes...</Text>
           </TouchableOpacity>
           <TouchableOpacity 
             style={styles.searchBarButton}
-            onPress={() => router.push('/home')}
+            onPress={() => router.push('/search')}
           >
             <Text style={styles.searchBarIcon}>🔍</Text>
           </TouchableOpacity>
@@ -289,14 +321,16 @@ export default function Home() {
             style={styles.categoriesScrollView}
             contentContainerStyle={styles.categoriesContainer}
           >
-            {categories.map((category) => (
+            {categories.map((category) => {
+              const isSelected = selectedCategory === category.name;
+              return (
               <TouchableOpacity
                 key={category.id}
                 onPress={() => setSelectedCategory(category.name)}
                 activeOpacity={0.8}
                 style={[
                   styles.categoryPill,
-                  selectedCategory === category.name && [
+                    isSelected && [
                     styles.categoryPillActive,
                     { backgroundColor: category.color }
                   ]
@@ -305,13 +339,14 @@ export default function Home() {
                 <Text
                   style={[
                     styles.categoryPillText,
-                    selectedCategory === category.name && styles.categoryPillTextActive
+                      isSelected && styles.categoryPillTextActive
                   ]}
                 >
                   {category.name}
                 </Text>
               </TouchableOpacity>
-            ))}
+              );
+            })}
           </ScrollView>
         </View>
 
@@ -322,12 +357,29 @@ export default function Home() {
             A curated selection from {selectedCategory}
           </Text>
         </View>
+        {loading ? (
+          <View style={{ padding: 40, alignItems: 'center' }}>
+            <ActivityIndicator size="large" color="#3C2253" />
+            <Text style={{ color: '#666', marginTop: 12 }}>Loading recipes...</Text>
+          </View>
+        ) : recipes.length === 0 ? (
+          <View style={{ padding: 40, alignItems: 'center' }}>
+            <Feather name="inbox" size={48} color="#999" />
+            <Text style={{ color: '#666', marginTop: 12 }}>No recipes found</Text>
+            <Text style={{ color: '#999', marginTop: 4, fontSize: 12 }}>Try selecting a different category</Text>
+            <Text style={{ color: '#999', marginTop: 8, fontSize: 10 }}>Category: {selectedCategory}</Text>
+          </View>
+        ) : recommendedMeals.length === 0 ? (
+          <View style={{ padding: 40, alignItems: 'center' }}>
+            <Text style={{ color: '#666' }}>Processing recipes...</Text>
+          </View>
+        ) : (
         <View style={styles.gridContainer}>
-          {filteredRecommendedMeals.map((meal, index) => {
+            {recommendedMeals.map((meal, index) => {
             const id = (meal as any).id ?? meal.title.replace(/\s+/g, '-').toLowerCase();
             const mealWithId = { ...(meal as any), id } as Meal & { id: string };
             return (
-              <View key={index} style={styles.gridItem}>
+              <View key={meal.id || index} style={styles.gridItem}>
                 <MealCard
                   meal={mealWithId}
                   onPress={() => handleMealPress(mealWithId)}
@@ -338,6 +390,7 @@ export default function Home() {
             );
           })}
         </View>
+        )}
         {/* Trending Section */}
         <View style={styles.trendingHeader}>
           <Feather name="trending-up" size={20} color="#fff" />
@@ -347,10 +400,10 @@ export default function Home() {
           </View>
         </View>
         {/* Featured Trending Meal */}
-        {filteredTrendingMeals.length > 0 && (
+        {!loading && trendingMeals.length > 0 && recipes.length > 4 && (
           <View style={styles.featuredContainer}>
             {(() => {
-              const meal = filteredTrendingMeals[0];
+              const meal = trendingMeals[0];
               const id = (meal as any).id ?? meal.title.replace(/\s+/g, '-').toLowerCase();
               const mealWithId = { ...(meal as any), id } as Meal & { id: string };
               return (
@@ -366,8 +419,9 @@ export default function Home() {
           </View>
         )}
         {/* Other Trending Meals */}
+        {!loading && trendingMeals.length > 1 && (
         <View style={styles.gridContainer}>
-          {filteredTrendingMeals.slice(1).map((meal, index) => {
+            {trendingMeals.slice(1).map((meal, index) => {
             const id = (meal as any).id ?? meal.title.replace(/\s+/g, '-').toLowerCase();
             const mealWithId = { ...(meal as any), id } as Meal & { id: string };
             return (
@@ -382,6 +436,7 @@ export default function Home() {
             );
           })}
         </View>
+        )}
         <View style={styles.bottomSpacer} />
       </ScrollView>
     </View>

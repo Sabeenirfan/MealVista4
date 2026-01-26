@@ -17,8 +17,10 @@ export default function Layout() {
           <Stack.Screen name="googleSignIn" /> {/* Google Sign In */}
           <Stack.Screen name="dietaryPreference" /> {/* Dietary Preference */}
           <Stack.Screen name="bmiCalculator" /> {/* BMI Calculator */}
+          <Stack.Screen name="healthGoal" /> {/* Health Goal */}
           <Stack.Screen name="allergenPreference" /> {/* Allergen Preference */}
           <Stack.Screen name="home" /> {/* Home Screen */}
+          <Stack.Screen name="search" /> {/* AI Search Screen */}
           <Stack.Screen name="profile" /> {/* Profile Screen */}
           <Stack.Screen name="favorites" /> {/* Favorites */}
           <Stack.Screen name="editProfile" /> {/* Edit Profile */}

@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import api from '../lib/api';
 
 interface Nutrient {
   label: string;
@@ -330,25 +331,28 @@ export default function CategoryDetail() {
       setLoading(true);
       setError(null);
       
-      // Use your backend API URL
-      const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL || 'http://192.168.56.1:5000';
-      const response = await fetch(`${backendUrl}/api/recipes/category/${category || 'italian'}`);
+      // Use centralized API configuration
+      const response = await api.get(`/api/recipes/category/${category || 'italian'}`);
       
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      
-      if (data.success) {
-        setRecipes(data.recipes);
+      if (response.data.success) {
+        setRecipes(response.data.recipes);
       } else {
-        throw new Error(data.message || 'Failed to fetch recipes');
+        throw new Error(response.data.message || 'Failed to fetch recipes');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error fetching recipes:', err);
-      setError(err instanceof Error ? err.message : 'Failed to fetch recipes');
-      Alert.alert('Error', 'Failed to load recipes. Please check your backend connection.');
+      let errorMessage = 'Failed to fetch recipes';
+      
+      if (err.message === 'Network Error' || err.code === 'ECONNREFUSED') {
+        errorMessage = 'Unable to connect to server. Please check:\n1. Backend server is running\n2. Correct IP address in app.json\n3. Device and server are on same network';
+      } else if (err.response?.data?.message) {
+        errorMessage = err.response.data.message;
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
+      setError(errorMessage);
+      Alert.alert('Error', errorMessage);
     } finally {
       setLoading(false);
     }
@@ -357,7 +361,23 @@ export default function CategoryDetail() {
   const categoryColor = categoryColors[category || 'italian'];
 
   const handleRecipePress = (recipe: Recipe) => {
-    setSelectedRecipe(recipe);
+    router.push({
+      pathname: '/recipeDetails',
+      params: {
+        mealTitle: recipe.name,
+        mealImage: recipe.image,
+        mealTime: (recipe.prepTime + recipe.cookTime).toString(),
+        mealCalories: recipe.calories.toString(),
+        mealDifficulty: recipe.difficulty,
+        mealRating: recipe.rating.toString(),
+        recipeId: recipe.id,
+        ingredients: JSON.stringify(recipe.ingredients || []),
+        instructions: JSON.stringify(recipe.instructions || []),
+        macros: JSON.stringify(recipe.macros || {}),
+        micros: JSON.stringify(recipe.micros || {}),
+        allergens: JSON.stringify(recipe.allergens || []),
+      },
+    });
   };
 
   if (!selectedRecipe) {

@@ -104,15 +104,21 @@ export default function RecipeDetails() {
       pathname: '/instructions',
       params: {
         mealTitle: meal.title,
+        mealImage: meal.image,
+        instructions: params.instructions as string || '[]',
       },
     });
   };
 
   const handleViewNutrients = () => {
-    const paramsToSend: any = { mealTitle: meal.title };
-    if (params.macros) paramsToSend.macros = params.macros;
-    if (params.micros) paramsToSend.micros = params.micros;
-    router.push({ pathname: '/nutritionalBreakdown', params: paramsToSend });
+    router.push({ 
+      pathname: '/macronutrients', 
+      params: {
+        mealTitle: meal.title,
+        macros: params.macros as string || '{}',
+        micros: params.micros as string || '{}',
+      }
+    });
   };
 
   const handleViewAllergens = () => {
