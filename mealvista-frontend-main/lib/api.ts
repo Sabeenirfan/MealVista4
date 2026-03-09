@@ -38,17 +38,14 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 15000,
+  timeout: 60000,
 });
 
 api.interceptors.request.use(async (config) => {
   const token = await getStoredToken();
 
   if (token) {
-    config.headers = {
-      ...config.headers,
-      Authorization: `Bearer ${token}`,
-    };
+    config.headers.Authorization = `Bearer ${token}`;
   }
 
   console.log('[API] Request:', config.method?.toUpperCase(), baseURL + config.url);
@@ -67,7 +64,7 @@ api.interceptors.response.use(
       message: error?.message,
       baseURL: baseURL,
     });
-    
+
     // Provide more helpful error messages for network issues
     if (error.code === 'ECONNREFUSED' || error.message === 'Network Error') {
       console.error('[API] Network Error - Check:');
@@ -75,11 +72,11 @@ api.interceptors.response.use(
       console.error('  2. API URL configured correctly:', baseURL);
       console.error('  3. Device/emulator can reach the server IP');
       console.error('  4. Firewall allows connections on port 5000');
-      
+
       // Enhance error message
       error.message = `Network Error: Cannot connect to ${baseURL}. Please check your backend server and network configuration.`;
     }
-    
+
     return Promise.reject(error);
   }
 );

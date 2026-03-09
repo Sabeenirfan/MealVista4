@@ -997,7 +997,7 @@ router.get('/search/:query', async (req, res) => {
     console.log(`🎯 Generating OpenAI recipes for: "${query}"`);
     console.log(`📊 User Profile: ${JSON.stringify(userProfile)}`);
 
-    const aiRecipes = await aiRecipeGenerator.generateRecipesForSearch(userProfile, query, 5);
+    const aiRecipes = await aiRecipeGenerator.generateRecipesForSearch(userProfile, query, 2);
 
     res.json({
       success: true,

@@ -15,6 +15,11 @@ export interface AuthUser {
   bmi?: number;
   bmiCategory?: string;
   healthGoal?: 'weight_loss' | 'weight_gain' | 'maintenance';
+  exerciseLevel?: 'low' | 'moderate' | 'high';
+  age?: number;
+  gender?: 'male' | 'female' | 'other';
+  dailyCalorieTarget?: number;
+  onboardingComplete?: boolean;
 }
 
 export interface User {
@@ -124,8 +129,8 @@ export const getProfile = async (): Promise<ProfileResponse> => {
 };
 
 // Update user profile
-export const updateProfile = async (data: { 
-  name?: string; 
+export const updateProfile = async (data: {
+  name?: string;
   email?: string;
   dietaryPreferences?: string[];
   allergens?: string[];
@@ -134,6 +139,10 @@ export const updateProfile = async (data: {
   bmi?: number;
   bmiCategory?: string;
   healthGoal?: 'weight_loss' | 'weight_gain' | 'maintenance';
+  exerciseLevel?: 'low' | 'moderate' | 'high';
+  age?: number;
+  gender?: 'male' | 'female' | 'other';
+  onboardingComplete?: boolean;
 }): Promise<ProfileResponse> => {
   try {
     const response = await api.put<ProfileResponse>('/api/auth/me', data);
@@ -179,7 +188,7 @@ export const getInventory = async (category?: string, search?: string): Promise<
     const params: any = {};
     if (category && category !== 'all') params.category = category;
     if (search) params.search = search;
-    
+
     const response = await api.get<InventoryResponse>('/api/admin/inventory', { params });
     return response.data;
   } catch (error: any) {

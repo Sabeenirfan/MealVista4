@@ -56,6 +56,9 @@ const adminRoutes = require('./routes/admin');
 const inventoryRoutes = require('./routes/inventory');
 const otpAuthRoutes = require('./routes/otp-auth');
 const recipesRoutes = require('./routes/recipes');
+const allergensRoutes = require('./routes/allergens');
+const ordersRoutes = require('./routes/orders');
+const ingredientsRoutes = require('./routes/ingredients');
 
 // Use routes
 app.use('/api/auth', authRoutes);
@@ -64,9 +67,18 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/admin/inventory', inventoryRoutes);
 app.use('/api/otp-auth', otpAuthRoutes); // New OTP-based auth routes
 app.use('/api/recipes', recipesRoutes); // Recipes API
+app.use('/api/allergens', allergensRoutes); // AI Allergen Detection & Substitution
+app.use('/api/orders', ordersRoutes); // Order placement & history
+app.use('/api/ingredients', ingredientsRoutes); // User-facing ingredient catalog
+const mealplanRoutes = require('./routes/mealplan');
+app.use('/api/mealplan', mealplanRoutes); // Meal planning & I Cooked It
+const behaviorRoutes = require('./routes/behavior');
+app.use('/api/behavior', behaviorRoutes); // AI Behavioral Learning
+const bmiRoutes = require('./routes/bmiAnalytics');
+app.use('/api/bmi', bmiRoutes); // BMI Analytics & Evaluation
 
 app.get('/', (req, res) => {
-  res.json({ 
+  res.json({
     message: 'MealVista API is running',
     timestamp: new Date().toISOString(),
     mongodb: 'connected'
@@ -75,7 +87,7 @@ app.get('/', (req, res) => {
 
 // Test endpoint for connection verification
 app.get('/api/test', (req, res) => {
-  res.json({ 
+  res.json({
     message: 'Backend is working!',
     timestamp: new Date().toISOString(),
     status: 'success'

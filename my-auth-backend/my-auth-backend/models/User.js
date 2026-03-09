@@ -13,7 +13,7 @@ const userSchema = new mongoose.Schema({
   },
   password: {
     type: String,
-    required: function() {
+    required: function () {
       return !this.googleId; // Required only if not Google user
     }
   },
@@ -69,6 +69,28 @@ const userSchema = new mongoose.Schema({
     enum: ['weight_loss', 'weight_gain', 'maintenance'],
     default: null
   },
+  exerciseLevel: {
+    type: String,
+    enum: ['low', 'moderate', 'high'],
+    default: null
+  },
+  age: {
+    type: Number,
+    default: null
+  },
+  gender: {
+    type: String,
+    enum: ['male', 'female', 'other'],
+    default: null
+  },
+  dailyCalorieTarget: {
+    type: Number,
+    default: null
+  },
+  onboardingComplete: {
+    type: Boolean,
+    default: false
+  },
   isDeleted: {
     type: Boolean,
     default: false
@@ -96,11 +118,23 @@ const userSchema = new mongoose.Schema({
   createdAt: {
     type: Date,
     default: Date.now
+  },
+  cachedRecommendedMeals: {
+    type: [Object],
+    default: []
+  },
+  cachedSeasonalMeals: {
+    type: [Object],
+    default: []
+  },
+  lastRecipeCache: {
+    type: Date,
+    default: null
   }
 });
 
 // Google users have email auto-verified
-userSchema.pre('save', function(next) {
+userSchema.pre('save', function (next) {
   if (this.googleId && !this.isEmailVerified) {
     this.isEmailVerified = true;
     this.emailVerifiedAt = new Date();
