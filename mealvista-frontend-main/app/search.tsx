@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useFavorites } from '../contexts/FavoritesContext';
 import api from '../lib/api';
 import { getProfile } from '../lib/authService';
 
@@ -47,6 +48,7 @@ interface Recipe {
 
 export default function SearchScreen() {
   const router = useRouter();
+  const { trackSearch } = useFavorites();
   const [searchQuery, setSearchQuery] = useState('');
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [loading, setLoading] = useState(false);
@@ -60,7 +62,7 @@ export default function SearchScreen() {
 
     try {
       setLoading(true);
-      
+
       // Load user profile for personalization
       try {
         const profileResponse = await getProfile();
@@ -68,16 +70,18 @@ export default function SearchScreen() {
       } catch (error) {
         console.log('Could not load user profile, using default');
       }
-      
+
       console.log('[AI Search] Searching with query:', searchQuery);
-      
+
       // Call AI-powered search endpoint
       const response = await api.get(`/api/recipes/search/${encodeURIComponent(searchQuery.trim())}`);
 
       if (response.data.success) {
         setRecipes(response.data.recipes || []);
         console.log(`[AI Search] Found ${response.data.recipes?.length || 0} personalized recipes`);
-        
+        // Track search for behavioral learning
+        trackSearch(searchQuery.trim());
+
         if (response.data.personalized && response.data.recipes?.length > 0) {
           Alert.alert(
             'AI Personalized Recipes',
@@ -123,11 +127,11 @@ export default function SearchScreen() {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#3C2253" />
-      
+
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity 
-          onPress={() => router.back()} 
+        <TouchableOpacity
+          onPress={() => router.back()}
           style={styles.backButton}
         >
           <Feather name="arrow-left" size={24} color="#fff" />
@@ -151,7 +155,7 @@ export default function SearchScreen() {
             autoFocus
           />
           {searchQuery.length > 0 && (
-            <TouchableOpacity 
+            <TouchableOpacity
               onPress={() => setSearchQuery('')}
               style={styles.clearButton}
             >
@@ -159,7 +163,7 @@ export default function SearchScreen() {
             </TouchableOpacity>
           )}
         </View>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.searchButton}
           onPress={handleSearch}
           disabled={loading || searchQuery.length < 2}
@@ -175,7 +179,7 @@ export default function SearchScreen() {
       {/* AI Info Banner */}
       {userProfile && (userProfile.bmi || userProfile.healthGoal || userProfile.dietaryPreferences?.length > 0) && (
         <View style={styles.aiInfoBanner}>
-          <Feather name="sparkles" size={16} color="#3C2253" />
+          <Feather name="star" size={16} color="#3C2253" />
           <Text style={styles.aiInfoText}>
             Recipes personalized for your profile (BMI: {userProfile.bmiCategory}, Goal: {userProfile.healthGoal === 'weight_loss' ? 'Weight Loss' : userProfile.healthGoal === 'weight_gain' ? 'Weight Gain' : 'Maintenance'})
           </Text>
@@ -205,7 +209,7 @@ export default function SearchScreen() {
               </Text>
               {recipes[0]?.isAIGenerated && (
                 <View style={styles.aiBadge}>
-                  <Feather name="sparkles" size={12} color="#3C2253" />
+                  <Feather name="star" size={12} color="#3C2253" />
                   <Text style={styles.aiBadgeText}>AI Generated</Text>
                 </View>
               )}
@@ -217,8 +221,8 @@ export default function SearchScreen() {
                 onPress={() => handleRecipePress(recipe)}
                 activeOpacity={0.8}
               >
-                <Image 
-                  source={{ uri: recipe.image }} 
+                <Image
+                  source={{ uri: recipe.image }}
                   style={styles.recipeImage}
                   resizeMode="cover"
                 />
@@ -229,7 +233,7 @@ export default function SearchScreen() {
                     </Text>
                     {recipe.isAIGenerated && (
                       <View style={styles.aiTag}>
-                        <Feather name="sparkles" size={10} color="#3C2253" />
+                        <Feather name="star" size={10} color="#3C2253" />
                       </View>
                     )}
                   </View>

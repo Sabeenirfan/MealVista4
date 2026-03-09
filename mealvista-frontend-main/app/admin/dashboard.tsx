@@ -12,6 +12,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { logout, getProfile, getAllUsers, getInventory } from "../../lib/authService";
 import { AuthUser } from "../../lib/authService";
+import api from "../../lib/api";
+import { getStoredToken } from "../../lib/authStorage";
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -19,6 +21,8 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [userCount, setUserCount] = useState(0);
   const [inventoryCount, setInventoryCount] = useState(0);
+  const [orderCount, setOrderCount] = useState(0);
+  const [salesRevenue, setSalesRevenue] = useState(0);
 
   useEffect(() => {
     loadDashboardData();
@@ -26,15 +30,20 @@ export default function AdminDashboard() {
 
   const loadDashboardData = async () => {
     try {
-      const [profileResponse, usersResponse, inventoryResponse] = await Promise.all([
+      const token = await getStoredToken();
+      const headers = { Authorization: `Bearer ${token}` };
+      const [profileResponse, usersResponse, inventoryResponse, ordersResponse, salesResponse] = await Promise.all([
         getProfile(),
         getAllUsers(),
-        getInventory()
+        getInventory(),
+        api.get('/api/admin/orders?limit=1', { headers }).catch(() => ({ data: { total: 0 } })),
+        api.get('/api/admin/sales', { headers }).catch(() => ({ data: { stats: { total: { revenue: 0 } } } })),
       ]);
-      
       setUser(profileResponse.user);
       setUserCount(usersResponse.count || 0);
       setInventoryCount(inventoryResponse.count || 0);
+      setOrderCount(ordersResponse.data?.total || 0);
+      setSalesRevenue(salesResponse.data?.stats?.total?.revenue || 0);
     } catch (error) {
       console.error("Failed to load dashboard data:", error);
     } finally {
@@ -67,6 +76,22 @@ export default function AdminDashboard() {
       icon: "restaurant-outline",
       color: "#10B981",
       route: "/admin/inventory",
+    },
+    {
+      id: "orders",
+      title: "Order Management",
+      description: "View all orders, update delivery status",
+      icon: "receipt-outline",
+      color: "#F59E0B",
+      route: "/admin/orders",
+    },
+    {
+      id: "sales",
+      title: "Sales Dashboard",
+      description: "Revenue analytics, order stats, low-stock alerts",
+      icon: "bar-chart-outline",
+      color: "#3B82F6",
+      route: "/admin/sales",
     },
   ];
 
@@ -114,6 +139,30 @@ export default function AdminDashboard() {
               <>
                 <Text style={styles.statNumber}>{inventoryCount}</Text>
                 <Text style={styles.statLabel}>Inventory Items</Text>
+              </>
+            )}
+          </View>
+          <View style={styles.statCard}>
+            <Ionicons name="receipt" size={32} color="#F59E0B" />
+            {loading ? (
+              <ActivityIndicator size="small" color="#F59E0B" style={{ marginTop: 8 }} />
+            ) : (
+              <>
+                <Text style={styles.statNumber}>{orderCount}</Text>
+                <Text style={styles.statLabel}>Orders</Text>
+              </>
+            )}
+          </View>
+          <View style={styles.statCard}>
+            <Ionicons name="cash" size={32} color="#3B82F6" />
+            {loading ? (
+              <ActivityIndicator size="small" color="#3B82F6" style={{ marginTop: 8 }} />
+            ) : (
+              <>
+                <Text style={[styles.statNumber, { fontSize: salesRevenue >= 1000 ? 20 : 32 }]}>
+                  Rs {salesRevenue >= 1000 ? `${(salesRevenue / 1000).toFixed(1)}K` : salesRevenue.toFixed(0)}
+                </Text>
+                <Text style={styles.statLabel}>Revenue</Text>
               </>
             )}
           </View>

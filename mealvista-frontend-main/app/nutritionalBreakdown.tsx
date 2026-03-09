@@ -13,103 +13,145 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 export default function NutritionalBreakdown() {
   const router = useRouter();
   const params = useLocalSearchParams();
-  const mealTitle = params.mealTitle as string || 'Creamy Pumpkin Soup';
-  const handleViewMacronutrients = () => {
-    router.push({ pathname: '/macronutrients', params: { mealTitle } });
-  };
 
-  // If macros were passed via params, use them; otherwise fall back to defaults
-  const passedMacros = params.macros ? JSON.parse(params.macros as string) : null;
-  const nutritionData = passedMacros
-    ? {
-        calories: Number(params.mealCalories) || Math.round((passedMacros.protein || 0) * 4 + (passedMacros.carbs || 0) * 4 + (passedMacros.fat || 0) * 9),
-        protein: passedMacros.protein || 0,
-        carbs: passedMacros.carbs || 0,
-        fat: passedMacros.fat || 0,
-        fiber: passedMacros.fiber || 0,
-        sugar: 0,
-      }
-    : {
-        calories: 290,
-        protein: 8,
-        carbs: 42,
-        fat: 12,
-        fiber: 5,
-        sugar: 8,
-      };
+  const mealTitle = params.mealTitle as string || 'Recipe';
+  const mealCalories = Number(params.mealCalories) || 0;
+  const dailyCalorieTarget = Number(params.dailyCalorieTarget) || 2000;
+
+  let macros: any = {};
+  try { macros = params.macros ? JSON.parse(params.macros as string) : {}; } catch { }
+
+  const calories = mealCalories || (
+    (macros.protein || 0) * 4 +
+    (macros.carbs || 0) * 4 +
+    (macros.fat || 0) * 9
+  );
+
+  const pctOfDaily = dailyCalorieTarget > 0
+    ? Math.round((calories / dailyCalorieTarget) * 100)
+    : 0;
+
+  // Color based on how much of daily target this meal covers
+  const pctColor = pctOfDaily > 60 ? '#EF4444' : pctOfDaily > 35 ? '#F59E0B' : '#10B981';
+
+  const handleViewMacros = () => {
+    router.push({
+      pathname: '/macronutrients',
+      params: {
+        mealTitle,
+        macros: params.macros as string || '{}',
+        micros: params.micros as string || '{}',
+        mealCalories: String(calories),
+        dailyCalorieTarget: String(dailyCalorieTarget),
+      },
+    });
+  };
 
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#3C2253" />
-      
-      {/* Header */}
+
       <View style={styles.header}>
-        <TouchableOpacity 
-          onPress={() => router.back()} 
-          style={styles.backButton}
-        >
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <Feather name="arrow-left" size={24} color="#fff" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Nutritional Breakdown</Text>
         <View style={styles.placeholder} />
       </View>
 
-      <ScrollView 
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={styles.content}>
+          {/* AI Badge */}
+          <View style={styles.aiBadge}>
+            <Feather name="cpu" size={13} color="#7C3AED" />
+            <Text style={styles.aiBadgeText}>AI-Calculated Nutrition · For 1 Serving</Text>
+          </View>
+
           <Text style={styles.recipeTitle}>{mealTitle}</Text>
-          <Text style={styles.subtitle}>Complete nutritional information</Text>
 
-          {/* Main Nutrition Card */}
-          <View style={styles.nutritionCard}>
-            <View style={styles.caloriesSection}>
-              <Text style={styles.caloriesValue}>{nutritionData.calories}</Text>
-              <Text style={styles.caloriesLabel}>Calories</Text>
+          {/* Hero Calorie Card */}
+          <View style={styles.calorieHeroCard}>
+            <View style={styles.calorieHeroLeft}>
+              <Text style={styles.calorieHeroLabel}>TOTAL CALORIES</Text>
+              <Text style={styles.calorieHeroValue}>
+                {calories > 0 ? calories.toLocaleString() : '—'}
+              </Text>
+              <Text style={styles.calorieHeroUnit}>kcal per serving</Text>
             </View>
-
-            <View style={styles.macrosGrid}>
-              <View style={styles.macroCard}>
-                <Text style={styles.macroValue}>{nutritionData.protein}</Text>
-                <Text style={styles.macroUnit}>g</Text>
-                <Text style={styles.macroLabel}>Protein</Text>
-              </View>
-              <View style={styles.macroCard}>
-                <Text style={styles.macroValue}>{nutritionData.carbs}</Text>
-                <Text style={styles.macroUnit}>g</Text>
-                <Text style={styles.macroLabel}>Carbs</Text>
-              </View>
-              <View style={styles.macroCard}>
-                <Text style={styles.macroValue}>{nutritionData.fat}</Text>
-                <Text style={styles.macroUnit}>g</Text>
-                <Text style={styles.macroLabel}>Fat</Text>
+            <View style={styles.calorieHeroRight}>
+              <View style={[styles.pctRing, { borderColor: pctColor }]}>
+                <Text style={[styles.pctValue, { color: pctColor }]}>{pctOfDaily}%</Text>
+                <Text style={styles.pctLabel}>daily{'\n'}target</Text>
               </View>
             </View>
           </View>
 
-          {/* Additional Nutrients */}
-          <View style={styles.additionalSection}>
-            <Text style={styles.sectionTitle}>Additional Nutrients</Text>
-            <View style={styles.nutrientRow}>
-              <Text style={styles.nutrientLabel}>Fiber</Text>
-              <Text style={styles.nutrientValue}>{nutritionData.fiber}g</Text>
+          {/* Daily Target Context */}
+          {dailyCalorieTarget > 0 && (
+            <View style={styles.dailyContextCard}>
+              <Feather name="target" size={16} color="#3C2253" />
+              <Text style={styles.dailyContextText}>
+                Your daily calorie target is{' '}
+                <Text style={styles.dailyContextBold}>{dailyCalorieTarget.toLocaleString()} kcal</Text>
+                {calories > 0 && (
+                  <>
+                    {' '}— this meal covers{' '}
+                    <Text style={[styles.dailyContextBold, { color: pctColor }]}>{pctOfDaily}%</Text>
+                    {' '}({(dailyCalorieTarget - calories).toLocaleString()} kcal remaining)
+                  </>
+                )}
+              </Text>
             </View>
-            <View style={[styles.nutrientRow, styles.lastNutrientRow]}>
-              <Text style={styles.nutrientLabel}>Sugar</Text>
-              <Text style={styles.nutrientValue}>{nutritionData.sugar}g</Text>
+          )}
+
+          {/* Quick Macro Overview */}
+          {(macros.protein || macros.carbs || macros.fat) ? (
+            <View style={styles.macrosOverview}>
+              <Text style={styles.sectionTitle}>Quick Macros</Text>
+              <View style={styles.macrosRow}>
+                {[
+                  { label: 'Protein', value: macros.protein, unit: 'g', color: '#3B82F6' },
+                  { label: 'Carbs', value: macros.carbs, unit: 'g', color: '#10B981' },
+                  { label: 'Fat', value: macros.fat, unit: 'g', color: '#F59E0B' },
+                  { label: 'Fiber', value: macros.fiber, unit: 'g', color: '#8B5CF6' },
+                ].filter(m => m.value != null).map((macro, i) => (
+                  <View key={i} style={[styles.macroChip, { borderColor: macro.color }]}>
+                    <Text style={[styles.macroChipValue, { color: macro.color }]}>
+                      {macro.value}{macro.unit}
+                    </Text>
+                    <Text style={styles.macroChipLabel}>{macro.label}</Text>
+                  </View>
+                ))}
+              </View>
             </View>
+          ) : null}
+
+          {/* Info note */}
+          <View style={styles.infoBox}>
+            <Feather name="info" size={15} color="#3C2253" />
+            <Text style={styles.infoText}>
+              These values are generated by OpenAI GPT-4o-mini based on real nutritional data for each ingredient and serving size.
+            </Text>
           </View>
 
-          {/* Action Button */}
-          <TouchableOpacity 
-            style={styles.actionButton}
-            onPress={handleViewMacronutrients}
+          {/* Action Buttons */}
+          <TouchableOpacity style={styles.primaryButton} onPress={handleViewMacros} activeOpacity={0.8}>
+            <Feather name="pie-chart" size={18} color="#fff" />
+            <Text style={styles.primaryButtonText}>Detailed Macronutrients</Text>
+            <Feather name="arrow-right" size={16} color="#fff" />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.secondaryButton}
+            onPress={() => router.push({
+              pathname: '/micronutrients',
+              params: { mealTitle, micros: params.micros as string || '{}' },
+            })}
             activeOpacity={0.8}
           >
-            <Feather name="pie-chart" size={18} color="#fff" />
-            <Text style={styles.actionButtonText}>View Macronutrients</Text>
+            <Feather name="layers" size={18} color="#3C2253" />
+            <Text style={styles.secondaryButtonText}>Vitamins & Minerals</Text>
+            <Feather name="arrow-right" size={16} color="#3C2253" />
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -118,157 +160,88 @@ export default function NutritionalBreakdown() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F9FAFB',
-  },
+  container: { flex: 1, backgroundColor: '#F9FAFB' },
   header: {
-    backgroundColor: '#3C2253',
-    paddingHorizontal: 16,
-    paddingTop: 50,
-    paddingBottom: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    backgroundColor: '#3C2253', paddingHorizontal: 16,
+    paddingTop: 50, paddingBottom: 16,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
   },
-  backButton: {
-    padding: 8,
+  backButton: { padding: 8 },
+  headerTitle: { fontSize: 18, fontWeight: 'bold', color: '#fff' },
+  placeholder: { width: 40 },
+  scrollView: { flex: 1 },
+  scrollContent: { paddingBottom: 32 },
+  content: { padding: 20 },
+
+  aiBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: '#F5F3FF', borderRadius: 20,
+    paddingHorizontal: 12, paddingVertical: 5,
+    alignSelf: 'flex-start', marginBottom: 12,
+    borderWidth: 1, borderColor: '#DDD6FE',
   },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#fff',
+  aiBadgeText: { fontSize: 12, color: '#7C3AED', fontWeight: '600' },
+
+  recipeTitle: { fontSize: 22, fontWeight: 'bold', color: '#1F2937', marginBottom: 20, lineHeight: 28 },
+
+  calorieHeroCard: {
+    backgroundColor: '#3C2253', borderRadius: 20, padding: 24,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    marginBottom: 16,
+    shadowColor: '#3C2253', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8,
+    elevation: 5,
   },
-  placeholder: {
-    width: 40,
+  calorieHeroLeft: { flex: 1 },
+  calorieHeroLabel: { fontSize: 11, color: '#D8B4FE', fontWeight: '700', letterSpacing: 1, marginBottom: 4 },
+  calorieHeroValue: { fontSize: 56, fontWeight: '800', color: '#fff', lineHeight: 64 },
+  calorieHeroUnit: { fontSize: 14, color: '#D8B4FE' },
+  calorieHeroRight: { marginLeft: 16 },
+  pctRing: {
+    width: 80, height: 80, borderRadius: 40,
+    borderWidth: 5, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.1)',
   },
-  scrollView: {
-    flex: 1,
+  pctValue: { fontSize: 20, fontWeight: '800' },
+  pctLabel: { fontSize: 9, color: '#fff', textAlign: 'center', lineHeight: 12 },
+
+  dailyContextCard: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: 10,
+    backgroundColor: '#F0EFFF', borderRadius: 12, padding: 14,
+    marginBottom: 24, borderWidth: 1, borderColor: '#DDD6FE',
   },
-  scrollContent: {
-    paddingBottom: 24,
-  },
-  content: {
-    padding: 20,
-  },
-  recipeTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#1F2937',
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 24,
-  },
-  nutritionCard: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 24,
-    marginBottom: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  caloriesSection: {
-    alignItems: 'center',
-    marginBottom: 24,
-    paddingBottom: 24,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-  },
-  caloriesValue: {
-    fontSize: 56,
-    fontWeight: 'bold',
-    color: '#3C2253',
-    marginBottom: 4,
-  },
-  caloriesLabel: {
-    fontSize: 16,
-    color: '#666',
-  },
-  macrosGrid: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    gap: 12,
-  },
-  macroCard: {
-    flex: 1,
-    alignItems: 'center',
-    backgroundColor: '#F9FAFB',
-    paddingVertical: 16,
-    paddingHorizontal: 12,
-    borderRadius: 12,
-  },
-  macroValue: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#1F2937',
-    marginBottom: 2,
-  },
-  macroUnit: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 6,
-  },
-  macroLabel: {
-    fontSize: 13,
-    color: '#666',
-    fontWeight: '500',
-  },
-  additionalSection: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
+  dailyContextText: { flex: 1, fontSize: 13, color: '#4B5563', lineHeight: 20 },
+  dailyContextBold: { fontWeight: '700', color: '#3C2253' },
+
+  macrosOverview: { marginBottom: 20 },
+  sectionTitle: { fontSize: 16, fontWeight: '700', color: '#1F2937', marginBottom: 14 },
+  macrosRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  macroChip: {
+    backgroundColor: '#fff', borderRadius: 12, borderWidth: 2,
+    paddingVertical: 12, paddingHorizontal: 16, alignItems: 'center', minWidth: 72,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 3,
     elevation: 2,
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#1F2937',
-    marginBottom: 16,
+  macroChipValue: { fontSize: 18, fontWeight: '800', marginBottom: 2 },
+  macroChipLabel: { fontSize: 11, color: '#6B7280', fontWeight: '500' },
+
+  infoBox: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: 10,
+    backgroundColor: '#F0EFFF', borderRadius: 12, padding: 14,
+    marginBottom: 24,
   },
-  nutrientRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+  infoText: { flex: 1, fontSize: 12, color: '#3C2253', lineHeight: 18 },
+
+  primaryButton: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    backgroundColor: '#3C2253', paddingVertical: 16, paddingHorizontal: 24,
+    borderRadius: 12, gap: 8, marginBottom: 12,
   },
-  lastNutrientRow: {
-    borderBottomWidth: 0,
+  primaryButtonText: { color: '#fff', fontSize: 15, fontWeight: '600', flex: 1, textAlign: 'center' },
+
+  secondaryButton: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    backgroundColor: '#fff', borderWidth: 1.5, borderColor: '#3C2253',
+    paddingVertical: 16, paddingHorizontal: 24, borderRadius: 12, gap: 8,
   },
-  nutrientLabel: {
-    fontSize: 15,
-    color: '#666',
-  },
-  nutrientValue: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#1F2937',
-  },
-  actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#3C2253',
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-    borderRadius: 12,
-    gap: 8,
-  },
-  actionButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
+  secondaryButtonText: { color: '#3C2253', fontSize: 15, fontWeight: '600', flex: 1, textAlign: 'center' },
 });

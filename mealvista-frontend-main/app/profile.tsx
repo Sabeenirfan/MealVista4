@@ -95,7 +95,7 @@ export default function ProfileScreen() {
       });
       setUser(response.user);
       setSuccessMessage("Profile updated successfully!");
-      
+
       // Clear success message after 3 seconds
       setTimeout(() => {
         setSuccessMessage(null);
@@ -113,20 +113,20 @@ export default function ProfileScreen() {
 
   const handleLogout = () => {
     console.log("=== LOGOUT BUTTON CLICKED ===");
-    
+
     // Immediately try to logout without alert for testing
     (async () => {
       try {
         console.log("Clearing token...");
         await logout();
         console.log("Token cleared!");
-        
+
         // Try using href instead of replace
         console.log("Navigating using router.push...");
         setTimeout(() => {
           router.push("/signIn");
         }, 100);
-        
+
       } catch (err) {
         console.error("Logout error:", err);
       }
@@ -174,7 +174,7 @@ export default function ProfileScreen() {
 
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity 
+        <TouchableOpacity
           onPress={() => {
             console.log("Back button pressed");
             if (router.canGoBack()) {
@@ -182,7 +182,7 @@ export default function ProfileScreen() {
             } else {
               router.replace('/home');
             }
-          }} 
+          }}
           style={styles.backButton}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           activeOpacity={0.6}
@@ -190,11 +190,11 @@ export default function ProfileScreen() {
           <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Profile</Text>
-        <TouchableOpacity 
+        <TouchableOpacity
           onPress={() => {
             console.log("LOGOUT ICON TAPPED!");
             handleLogout();
-          }} 
+          }}
           style={styles.logoutButton}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           activeOpacity={0.6}
@@ -253,7 +253,7 @@ export default function ProfileScreen() {
         {/* Health & Preferences Card */}
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>Health & Preferences</Text>
-          
+
           {user?.dietaryPreferences && user.dietaryPreferences.length > 0 && (
             <View style={styles.infoBlock}>
               <Text style={styles.infoLabel}>Dietary Preferences</Text>
@@ -293,6 +293,63 @@ export default function ProfileScreen() {
               )}
             </View>
           )}
+
+          {user?.dailyCalorieTarget && (
+            <View style={styles.infoBlock}>
+              <Text style={styles.infoLabel}>Daily Calorie Target</Text>
+              <Text style={styles.infoValue}>🔥 {user.dailyCalorieTarget} kcal / day</Text>
+            </View>
+          )}
+
+          {user?.healthGoal && (
+            <View style={styles.infoBlock}>
+              <Text style={styles.infoLabel}>Health Goal</Text>
+              <Text style={styles.infoValue}>
+                {user.healthGoal === 'weight_loss' ? '📉 Weight Loss'
+                  : user.healthGoal === 'weight_gain' ? '📈 Weight Gain'
+                    : '⚖️ Maintenance'}
+              </Text>
+            </View>
+          )}
+
+          {user?.exerciseLevel && (
+            <View style={styles.infoBlock}>
+              <Text style={styles.infoLabel}>Exercise Level</Text>
+              <Text style={styles.infoValue}>
+                {user.exerciseLevel === 'low' ? '🚶 Low activity'
+                  : user.exerciseLevel === 'moderate' ? '🏃 Moderate activity'
+                    : '🏋️ High activity'}
+              </Text>
+            </View>
+          )}
+        </View>
+
+        {/* ─── Quick Links ─── */}
+        <View style={styles.quickLinksRow}>
+          <TouchableOpacity
+            style={styles.quickLinkCard}
+            onPress={() => router.push('/mealPlan' as any)}
+          >
+            <Text style={styles.quickLinkIcon}>🍽️</Text>
+            <Text style={styles.quickLinkTitle}>Meal Plan</Text>
+            <Text style={styles.quickLinkSub}>Today's calories</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.quickLinkCard, { borderColor: '#DDD6FE' }]}
+            onPress={() => router.push('/bmiAnalytics' as any)}
+          >
+            <Text style={styles.quickLinkIcon}>📊</Text>
+            <Text style={styles.quickLinkTitle}>BMI Analytics</Text>
+            <Text style={styles.quickLinkSub}>Track progress</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.quickLinkCard, { borderColor: '#FDE68A' }]}
+            onPress={() => router.push('/orderHistory' as any)}
+          >
+            <Text style={styles.quickLinkIcon}>📦</Text>
+            <Text style={styles.quickLinkTitle}>Orders</Text>
+            <Text style={styles.quickLinkSub}>View history</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Profile Options */}
@@ -317,6 +374,14 @@ export default function ProfileScreen() {
             <View style={styles.optionLeft}>
               <Ionicons name="speedometer" size={20} color="#3C2253" />
               <Text style={styles.optionText}>Update BMI</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="#6B7280" />
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.optionItem} onPress={() => router.push('/bmiAnalytics' as any)}>
+            <View style={styles.optionLeft}>
+              <Ionicons name="bar-chart" size={20} color="#8B5CF6" />
+              <Text style={styles.optionText}>BMI Analytics</Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color="#6B7280" />
           </TouchableOpacity>
@@ -575,6 +640,32 @@ const styles = StyleSheet.create({
     color: '#111827',
     fontWeight: '600',
   },
+
+  // ── Quick Links ────────────────────────────────────────────
+  quickLinksRow: {
+    flexDirection: 'row',
+    gap: 10,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+  },
+  quickLinkCard: {
+    flex: 1,
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    padding: 14,
+    alignItems: 'center',
+    gap: 4,
+    borderWidth: 1.5,
+    borderColor: '#BBF7D0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  quickLinkIcon: { fontSize: 22 },
+  quickLinkTitle: { fontSize: 12, fontWeight: '700', color: '#1F2937', textAlign: 'center' },
+  quickLinkSub: { fontSize: 10, color: '#9CA3AF', textAlign: 'center' },
 });
 
 

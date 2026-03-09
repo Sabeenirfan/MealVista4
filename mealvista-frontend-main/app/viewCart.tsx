@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -7,24 +7,65 @@ import {
   Image,
   TouchableOpacity,
   SafeAreaView,
+  Alert,
+  ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useCart } from "../contexts/CartContext";
+import api from "../lib/api";
+import { getStoredToken } from "../lib/authStorage";
 
 const CartScreen: React.FC = () => {
   const router = useRouter();
-  const { cartItems, updateQuantity, removeFromCart, getTotalPrice, getTotalItems } = useCart();
+  const { cartItems, updateQuantity, removeFromCart, getTotalPrice, getTotalItems, clearCart } = useCart();
+  const [placing, setPlacing] = useState(false);
 
   const deliveryFee = 0;
   const total = getTotalPrice() + deliveryFee;
   const itemCount = getTotalItems();
 
-  const handleProceedToCheckout = () => {
-    if (cartItems.length === 0) {
-      return;
+  const handleProceedToCheckout = async () => {
+    if (cartItems.length === 0) return;
+
+    try {
+      setPlacing(true);
+      const token = await getStoredToken();
+      if (!token) {
+        Alert.alert('Sign In Required', 'Please sign in to place an order.');
+        return;
+      }
+
+      const items = cartItems.map(item => ({
+        name: item.name,
+        unitPrice: item.price,
+        quantity: item.quantity,
+        category: item.category || '',
+        image: item.image || '',
+      }));
+
+      const res = await api.post(
+        '/api/orders',
+        { items, paymentMethod: 'cash_on_delivery' },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      if (res.data.success) {
+        clearCart();
+        Alert.alert(
+          '✅ Order Placed!',
+          `Your order has been placed successfully.\nOrder ID: ${String(res.data.order.id).slice(-8).toUpperCase()}\nTotal: Rs ${res.data.order.totalAmount.toFixed(2)}\nEstimated Delivery: Tomorrow`,
+          [
+            { text: 'View Orders', onPress: () => router.push('/orderHistory' as any) },
+            { text: 'Done', onPress: () => router.push('/home') },
+          ]
+        );
+      }
+    } catch (err: any) {
+      Alert.alert('Order Failed', err?.response?.data?.message || 'Could not place order. Please try again.');
+    } finally {
+      setPlacing(false);
     }
-    router.push("/checkoutSummary");
   };
 
   return (
@@ -35,7 +76,7 @@ const CartScreen: React.FC = () => {
           <Ionicons name="arrow-back" size={24} color="#fff" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Your Cart</Text>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.headerIcon}
           onPress={() => router.push('/home')}
         >
@@ -69,9 +110,9 @@ const CartScreen: React.FC = () => {
             <Text style={styles.emptyCartText}>Your cart is empty</Text>
             <TouchableOpacity
               style={styles.shopButton}
-              onPress={() => router.push("/home")}
+              onPress={() => router.push('/ingredientCatalog' as any)}
             >
-              <Text style={styles.shopButtonText}>Continue Shopping</Text>
+              <Text style={styles.shopButtonText}>Browse Ingredients</Text>
             </TouchableOpacity>
           </View>
         ) : (
@@ -141,7 +182,7 @@ const CartScreen: React.FC = () => {
                   <Text style={styles.summaryLabel}>Delivery</Text>
                 </View>
                 <Text style={styles.summaryValue}>
-                  {deliveryFee === 0 ? "FREE" : `Rs ${deliveryFee.toFixed(2)}`}
+                  {deliveryFee === 0 ? "FREE" : `Rs ${Number(deliveryFee).toFixed(2)}`}
                 </Text>
               </View>
               <View style={styles.divider} />
@@ -158,10 +199,15 @@ const CartScreen: React.FC = () => {
       {cartItems.length > 0 && (
         <View style={styles.checkoutContainer}>
           <TouchableOpacity
-            style={styles.checkoutButton}
+            style={[styles.checkoutButton, placing && { opacity: 0.7 }]}
             onPress={handleProceedToCheckout}
+            disabled={placing}
           >
-            <Text style={styles.checkoutText}>Proceed to Checkout</Text>
+            {placing ? (
+              <ActivityIndicator color="#fff" size="small" />
+            ) : (
+              <Text style={styles.checkoutText}>Place Order</Text>
+            )}
             <Text style={styles.checkoutPrice}>RS {total.toFixed(2)}</Text>
           </TouchableOpacity>
         </View>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,10 +8,16 @@ import {
   StyleSheet,
   StatusBar,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useCart } from '../contexts/CartContext';
+import { useFavorites } from '../contexts/FavoritesContext';
+import { useMealPlan } from '../contexts/MealPlanContext';
+import { getProfile } from '../lib/authService';
+import api from '../lib/api';
+import { getStoredToken } from '../lib/authStorage';
 
 interface Ingredient {
   id: string;
@@ -24,7 +30,25 @@ export default function RecipeDetails() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const { getTotalItems, addToCart, cartItems } = useCart();
+  const { trackView } = useFavorites();
+  const { refresh: refreshMealPlan } = useMealPlan();
   const [selectedIngredients, setSelectedIngredients] = useState<string[]>([]);
+  const [dailyCalorieTarget, setDailyCalorieTarget] = useState<number>(2000);
+  const [cookingState, setCookingState] = useState<'idle' | 'cooking' | 'cooked'>('idle');
+
+  // Load user's daily calorie target from profile + track view
+  useEffect(() => {
+    getProfile()
+      .then(res => {
+        const target = (res.user as any)?.dailyCalorieTarget;
+        if (target) setDailyCalorieTarget(target);
+      })
+      .catch(() => { });
+    // Track this recipe view for behavioral learning
+    const recipeId = params.recipeId as string || params.mealTitle as string || '';
+    const recipeName = params.mealTitle as string || '';
+    if (recipeName) trackView(recipeId, recipeName);
+  }, []);
 
   const meal = {
     title: params.mealTitle as string || 'Creamy Pumpkin Soup',
@@ -35,25 +59,34 @@ export default function RecipeDetails() {
     rating: params.mealRating as string || '4.8',
   };
 
+  // Generate consistent pseudo-random price based on ingredient name string
+  const getPrice = (name: string) => {
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) {
+      hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return Math.abs(hash % 80) + 20; // Price between 20 and 100 Rs
+  };
+
   // Use ingredients passed via params (from backend) when available
   const passedIngredientsRaw = params.ingredients as string | undefined;
   const ingredientsList: Ingredient[] = passedIngredientsRaw
     ? JSON.parse(passedIngredientsRaw).map((name: string, i: number) => ({
-        id: String(i + 1),
-        name,
-        category: 'Pantry',
-        price: 0,
-      }))
+      id: String(i + 1),
+      name,
+      category: 'Pantry',
+      price: getPrice(name),
+    }))
     : [
-        { id: '1', name: 'Pumpkin Puree', category: 'Canned Goods', price: 3.99 },
-        { id: '2', name: 'Onion', category: 'Vegetables', price: 1.49 },
-        { id: '3', name: 'Garlic', category: 'Vegetables', price: 0.99 },
-        { id: '4', name: 'Vegetable Broth', category: 'Canned Goods', price: 2.99 },
-        { id: '5', name: 'Heavy Cream', category: 'Dairy', price: 4.99 },
-        { id: '6', name: 'Ground Cinnamon', category: 'Spices', price: 2.49 },
-        { id: '7', name: 'Nutmeg', category: 'Spices', price: 2.99 },
-        { id: '8', name: 'Olive Oil', category: 'Oils', price: 5.99 },
-      ];
+      { id: '1', name: 'Pumpkin Puree', category: 'Canned Goods', price: 3.99 },
+      { id: '2', name: 'Onion', category: 'Vegetables', price: 1.49 },
+      { id: '3', name: 'Garlic', category: 'Vegetables', price: 0.99 },
+      { id: '4', name: 'Vegetable Broth', category: 'Canned Goods', price: 2.99 },
+      { id: '5', name: 'Heavy Cream', category: 'Dairy', price: 4.99 },
+      { id: '6', name: 'Ground Cinnamon', category: 'Spices', price: 2.49 },
+      { id: '7', name: 'Nutmeg', category: 'Spices', price: 2.99 },
+      { id: '8', name: 'Olive Oil', category: 'Oils', price: 5.99 },
+    ];
 
   const handleToggleIngredient = (id: string) => {
     setSelectedIngredients((prev) =>
@@ -111,13 +144,15 @@ export default function RecipeDetails() {
   };
 
   const handleViewNutrients = () => {
-    router.push({ 
-      pathname: '/macronutrients', 
+    router.push({
+      pathname: '/nutritionalBreakdown',
       params: {
         mealTitle: meal.title,
+        mealCalories: meal.calories,
         macros: params.macros as string || '{}',
         micros: params.micros as string || '{}',
-      }
+        dailyCalorieTarget: String(dailyCalorieTarget),
+      },
     });
   };
 
@@ -127,6 +162,8 @@ export default function RecipeDetails() {
       params: {
         mealTitle: meal.title,
         mealImage: meal.image,
+        allergens: params.allergens as string || '[]',
+        ingredients: params.ingredients as string || '[]',
       },
     });
   };
@@ -135,20 +172,104 @@ export default function RecipeDetails() {
     router.push('/viewCart');
   };
 
+  const handleICookedIt = () => {
+    if (cookingState === 'cooked') {
+      Alert.alert('Already Logged', 'This recipe has already been added to your meal plan for today.');
+      return;
+    }
+
+    // Ask meal type first
+    Alert.alert(
+      '🍴 Log Meal',
+      'Which meal is this?',
+      [
+        { text: 'Breakfast', onPress: () => logMeal('breakfast') },
+        { text: 'Lunch', onPress: () => logMeal('lunch') },
+        { text: 'Dinner', onPress: () => logMeal('dinner') },
+        { text: 'Snack', onPress: () => logMeal('snack') },
+        { text: 'Cancel', style: 'cancel' },
+      ]
+    );
+  };
+
+  const logMeal = async (mealType: string) => {
+    try {
+      setCookingState('cooking');
+      const token = await getStoredToken();
+      if (!token) {
+        Alert.alert('Sign In Required', 'Please sign in to track your meals.');
+        setCookingState('idle');
+        return;
+      }
+
+      // Parse macros if available
+      let macros = {};
+      try {
+        const raw = params.macros as string;
+        if (raw) macros = JSON.parse(raw);
+      } catch { }
+
+      const res = await api.post(
+        '/api/mealplan/cook',
+        {
+          recipeName: meal.title,
+          calories: Number(meal.calories) || 0,
+          macros,
+          image: meal.image,
+          mealType,
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      if (res.data.success) {
+        setCookingState('cooked');
+
+        // Track cook event for AI behavioral learning (fire-and-forget)
+        try {
+          const token = await getStoredToken();
+          if (token) {
+            api.post(
+              '/api/behavior/track',
+              { event: 'cook', recipeId: params.recipeId || meal.title, recipeName: meal.title, calories: Number(meal.calories) || 0 },
+              { headers: { Authorization: `Bearer ${token}` } }
+            );
+          }
+        } catch { }
+
+        const { totalCalories, dailyTarget, remaining, exceeded } = res.data.mealPlan;
+
+        // Refresh the global meal plan context so the dashboard macro tracking updates immediately
+        await refreshMealPlan();
+
+        Alert.alert(
+          '✅ Meal Logged!',
+          `${meal.title} added to your meal plan.\n\nToday: ${totalCalories} / ${dailyTarget} kcal\n${exceeded ? '⚠️ You exceeded your daily target!' : `${remaining} kcal remaining`}`,
+          [
+            { text: 'View Meal Plan', onPress: () => router.push('/mealPlan' as any) },
+            { text: 'OK' },
+          ]
+        );
+      }
+    } catch (err: any) {
+      setCookingState('idle');
+      Alert.alert('Error', err?.response?.data?.message || 'Could not log meal. Please try again.');
+    }
+  };
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#3C2253" />
-      
+
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity 
-          onPress={() => router.back()} 
+        <TouchableOpacity
+          onPress={() => router.back()}
           style={styles.backButton}
         >
           <Feather name="arrow-left" size={24} color="#fff" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Recipe Details</Text>
-        <TouchableOpacity 
+        <TouchableOpacity
           onPress={handleCartPress}
           style={styles.cartButton}
         >
@@ -161,13 +282,13 @@ export default function RecipeDetails() {
         </TouchableOpacity>
       </View>
 
-      <ScrollView 
+      <ScrollView
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}
       >
         {/* Recipe Image */}
-        <Image 
-          source={{ uri: meal.image }} 
+        <Image
+          source={{ uri: meal.image }}
           style={styles.recipeImage}
           resizeMode="cover"
         />
@@ -175,7 +296,7 @@ export default function RecipeDetails() {
         {/* Recipe Info */}
         <View style={styles.content}>
           <Text style={styles.recipeTitle}>{meal.title}</Text>
-          
+
           <View style={styles.recipeMeta}>
             <View style={styles.metaBadge}>
               <Feather name="clock" size={14} color="#666" />
@@ -208,7 +329,7 @@ export default function RecipeDetails() {
 
           {/* Action Buttons */}
           <View style={styles.actionButtons}>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.primaryButton}
               onPress={handleViewInstructions}
               activeOpacity={0.8}
@@ -217,7 +338,7 @@ export default function RecipeDetails() {
               <Text style={styles.primaryButtonText}>View Instructions</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.secondaryButton}
               onPress={handleViewNutrients}
               activeOpacity={0.8}
@@ -226,7 +347,7 @@ export default function RecipeDetails() {
               <Text style={styles.secondaryButtonText}>View Nutrients</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.tertiaryButton}
               onPress={handleViewAllergens}
               activeOpacity={0.8}
@@ -234,14 +355,39 @@ export default function RecipeDetails() {
               <Feather name="alert-triangle" size={18} color="#3C2253" />
               <Text style={styles.tertiaryButtonText}>View Allergens</Text>
             </TouchableOpacity>
+
+            {/* I Cooked It Button */}
+            <TouchableOpacity
+              style={[
+                styles.cookedItButton,
+                cookingState === 'cooked' && styles.cookedItButtonDone,
+                cookingState === 'cooking' && { opacity: 0.7 },
+              ]}
+              onPress={handleICookedIt}
+              activeOpacity={0.8}
+              disabled={cookingState === 'cooking'}
+            >
+              {cookingState === 'cooking' ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Feather
+                  name={cookingState === 'cooked' ? 'check-circle' : 'check-square'}
+                  size={18}
+                  color="#fff"
+                />
+              )}
+              <Text style={styles.cookedItText}>
+                {cookingState === 'cooked' ? 'Logged Today ✓' : cookingState === 'cooking' ? 'Adding...' : 'I Cooked It!'}
+              </Text>
+            </TouchableOpacity>
           </View>
 
           {/* Description Section */}
           <View style={styles.descriptionSection}>
             <Text style={styles.sectionTitle}>Description</Text>
             <Text style={styles.descriptionText}>
-              A warm and comforting soup perfect for autumn. This creamy pumpkin 
-              soup combines the natural sweetness of pumpkin with aromatic spices 
+              A warm and comforting soup perfect for autumn. This creamy pumpkin
+              soup combines the natural sweetness of pumpkin with aromatic spices
               for a delightful culinary experience.
             </Text>
           </View>
@@ -250,17 +396,40 @@ export default function RecipeDetails() {
           <View style={styles.ingredientsSection}>
             <View style={styles.ingredientsHeader}>
               <Text style={styles.sectionTitle}>Ingredients</Text>
-              {selectedIngredients.length > 0 && (
-                <TouchableOpacity
-                  style={styles.addToCartButton}
-                  onPress={handleAddToCart}
-                >
-                  <Feather name="shopping-cart" size={16} color="#fff" />
-                  <Text style={styles.addToCartButtonText}>
-                    Add to Cart ({selectedIngredients.length})
-                  </Text>
-                </TouchableOpacity>
-              )}
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                {selectedIngredients.length > 0 && (
+                  <TouchableOpacity
+                    style={[styles.addToCartButton, { backgroundColor: '#ef4444', paddingHorizontal: 12 }]}
+                    onPress={() => setSelectedIngredients([])}
+                  >
+                    <Feather name="x" size={16} color="#fff" />
+                    <Text style={styles.addToCartButtonText}>
+                      Clear
+                    </Text>
+                  </TouchableOpacity>
+                )}
+                {selectedIngredients.length > 0 ? (
+                  <TouchableOpacity
+                    style={styles.addToCartButton}
+                    onPress={handleAddToCart}
+                  >
+                    <Feather name="shopping-cart" size={16} color="#fff" />
+                    <Text style={styles.addToCartButtonText}>
+                      Add ({selectedIngredients.length})
+                    </Text>
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity
+                    style={[styles.addToCartButton, { backgroundColor: '#3B82F6' }]}
+                    onPress={() => setSelectedIngredients(ingredientsList.map(i => i.id))}
+                  >
+                    <Feather name="check-square" size={16} color="#fff" />
+                    <Text style={styles.addToCartButtonText}>
+                      Select All
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
             </View>
             {ingredientsList.map((ingredient) => {
               const isSelected = selectedIngredients.includes(ingredient.id);
@@ -542,5 +711,23 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: '#3C2253',
+  },
+  cookedItButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#10B981',
+    borderRadius: 12,
+    paddingVertical: 14,
+    gap: 8,
+    marginTop: 4,
+  },
+  cookedItButtonDone: {
+    backgroundColor: '#6B7280',
+  },
+  cookedItText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '700',
   },
 });

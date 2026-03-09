@@ -1,85 +1,99 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from 'react';
 import {
-  View,
-  Text,
-  ScrollView,
-  Image,
-  TouchableOpacity,
-  StyleSheet,
-  StatusBar,
-} from "react-native";
-import { Feather } from "@expo/vector-icons";
-import { useRouter, useLocalSearchParams } from "expo-router";
-import { useCart } from "../contexts/CartContext";
+  View, Text, ScrollView, Image, TouchableOpacity,
+  StyleSheet, StatusBar, ActivityIndicator, Alert,
+} from 'react-native';
+import { Feather } from '@expo/vector-icons';
+import { useRouter, useLocalSearchParams } from 'expo-router';
+import { getStoredToken } from '../lib/authStorage';
+import api from '../lib/api';
 
-interface Ingredient {
-  id: string;
+interface DetectedAllergen {
   name: string;
-  category: string;
-  price: number;
-  image?: string;
+  severity: 'high' | 'medium' | 'low';
+  emoji: string;
+  triggerIngredients: string[];
+  description: string;
+  affectsUser: boolean;
 }
+
+interface AllergenResult {
+  detectedAllergens: DetectedAllergen[];
+  safeForUser: boolean;
+  summary: string;
+  totalAllergens: number;
+}
+
+const SEVERITY_STYLES: Record<string, { bg: string; border: string; text: string; badge: string }> = {
+  high: { bg: '#FFF1F2', border: '#FECDD3', text: '#BE123C', badge: '#FEE2E2' },
+  medium: { bg: '#FFFBEB', border: '#FDE68A', text: '#92400E', badge: '#FEF3C7' },
+  low: { bg: '#F0FDF4', border: '#BBF7D0', text: '#166534', badge: '#D1FAE5' },
+};
+
+const SEVERITY_COLOR: Record<string, string> = {
+  high: '#DC2626', medium: '#D97706', low: '#059669',
+};
 
 export default function SeeAllergens() {
   const router = useRouter();
   const params = useLocalSearchParams();
-  const { addToCart, getTotalItems } = useCart();
-  const [selectedIngredients, setSelectedIngredients] = useState<string[]>([]);
 
-  const mealTitle = params.mealTitle as string || "Classic Pasta Carbonara";
-  const mealImage = params.mealImage as string || "https://images.unsplash.com/photo-1612874742237-6526221588e3?w=800";
+  const mealTitle = params.mealTitle as string || 'Recipe';
+  const mealImage = params.mealImage as string || '';
 
-  const allergens = [
-    {
-      id: 1,
-      icon: "🥚",
-      name: "Contains Eggs",
-      severity: "high",
-      description: "Raw eggs used in traditional carbonara sauce",
-    },
-    {
-      id: 2,
-      icon: "🧈",
-      name: "Contains Dairy",
-      severity: "high",
-      description: "Parmesan cheese and possible cream",
-    },
-  ];
+  let ingredientsList: string[] = [];
+  try {
+    const raw = params.ingredients as string;
+    const parsed = raw ? JSON.parse(raw) : [];
+    ingredientsList = Array.isArray(parsed)
+      ? parsed.map((i: any) => typeof i === 'string' ? i : i.name || String(i))
+      : [];
+  } catch { }
 
-  const ingredients: Ingredient[] = [
-    { id: "1", name: "Eggs", category: "Dairy & Eggs", price: 4.99 },
-    { id: "2", name: "Parmesan Cheese", category: "Dairy", price: 8.99 },
-    { id: "3", name: "Pasta", category: "Grains", price: 3.99 },
-    { id: "4", name: "Bacon", category: "Meat", price: 6.99 },
-  ];
+  const [result, setResult] = useState<AllergenResult | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleToggleIngredient = (id: string) => {
-    setSelectedIngredients((prev) =>
-      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
-    );
-  };
+  useEffect(() => {
+    analyzeAllergens();
+  }, []);
 
-  const handleAddToCart = () => {
-    selectedIngredients.forEach((id) => {
-      const ingredient = ingredients.find((ing) => ing.id === id);
-      if (ingredient) {
-        addToCart({
-          id: `ingredient-${ingredient.id}`,
-          name: ingredient.name,
-          price: ingredient.price,
-          category: ingredient.category,
-        });
+  const analyzeAllergens = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const token = await getStoredToken();
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
+      const response = await api.post(
+        '/api/allergens/check',
+        { recipeName: mealTitle, ingredients: ingredientsList },
+        { headers }
+      );
+
+      if (response.data.success) {
+        setResult(response.data);
+      } else {
+        throw new Error(response.data.message || 'Analysis failed');
       }
-    });
-    // Navigate back or show success message
-    router.back();
+    } catch (err: any) {
+      console.error('[SeeAllergens] Error:', err.message);
+      setError('Could not analyze allergens. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleSeeSubstitutions = () => {
+  const handleGetSubstitution = (allergen: DetectedAllergen) => {
     router.push({
-      pathname: "/saveSubstitution",
+      pathname: '/saveSubstitution',
       params: {
-        mealTitle: mealTitle,
+        mealTitle,
+        mealImage,
+        ingredients: JSON.stringify(ingredientsList),
+        allergenToReplace: allergen.name,
+        allergenIngredients: JSON.stringify(allergen.triggerIngredients),
       },
     });
   };
@@ -88,366 +102,251 @@ export default function SeeAllergens() {
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#3C2253" />
 
-      {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => router.back()}
-        >
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <Feather name="arrow-left" size={24} color="#fff" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Recipe Allergens</Text>
-        <TouchableOpacity style={styles.cartButton} onPress={() => router.push('/viewCart')}>
-          <Feather name="shopping-cart" size={20} color="#fff" />
-          {getTotalItems() > 0 && (
-            <View style={styles.cartBadge}>
-              <Text style={styles.cartBadgeText}>{getTotalItems()}</Text>
-            </View>
-          )}
-        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Allergen Analysis</Text>
+        <View style={styles.placeholder} />
       </View>
 
-      <ScrollView
-        style={styles.scrollView}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-      >
-        {/* Recipe Card */}
-        <View style={styles.recipeCard}>
-          <Image source={{ uri: mealImage }} style={styles.recipeImage} />
-        </View>
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
 
-        {/* Recipe Info */}
-        <View style={styles.recipeInfo}>
+        {/* Recipe image */}
+        {mealImage ? (
+          <Image source={{ uri: mealImage }} style={styles.recipeImage} resizeMode="cover" />
+        ) : null}
+
+        <View style={styles.content}>
+          <View style={styles.aiBadge}>
+            <Feather name="cpu" size={13} color="#7C3AED" />
+            <Text style={styles.aiBadgeText}>AI-Powered Analysis · GPT-4o-mini</Text>
+          </View>
           <Text style={styles.recipeTitle}>{mealTitle}</Text>
-          <View style={styles.recipeDetails}>
-            <View style={styles.detailItem}>
-              <Feather name="clock" size={14} color="#6B7280" />
-              <Text style={styles.detailText}>20 min</Text>
-            </View>
-            <View style={styles.detailItem}>
-              <Feather name="users" size={14} color="#6B7280" />
-              <Text style={styles.detailText}>4 servings</Text>
-            </View>
-          </View>
-        </View>
 
-        {/* Detected Allergens Alert */}
-        <View style={styles.allergenAlert}>
-          <View style={styles.allergenAlertHeader}>
-            <Feather name="alert-triangle" size={18} color="#DC2626" />
-            <Text style={styles.allergenAlertText}>Detected Allergens</Text>
-          </View>
-        </View>
+          {/* Loading State */}
+          {loading && (
+            <View style={styles.loadingBox}>
+              <ActivityIndicator size="large" color="#3C2253" />
+              <Text style={styles.loadingTitle}>Analyzing Allergens...</Text>
+              <Text style={styles.loadingSubtitle}>
+                OpenAI is checking {ingredientsList.length} ingredient{ingredientsList.length !== 1 ? 's' : ''} against 14 major allergen groups
+              </Text>
+            </View>
+          )}
 
-        {/* Allergens List */}
-        <View style={styles.allergensList}>
-          {allergens.map((allergen) => (
-            <View key={allergen.id} style={styles.allergenCard}>
-              <View style={styles.allergenIconContainer}>
-                <Text style={styles.allergenEmoji}>{allergen.icon}</Text>
-              </View>
-              <View style={styles.allergenContent}>
-                <View style={styles.allergenHeader}>
-                  <Text style={styles.allergenName}>{allergen.name}</Text>
-                  <View style={styles.severityBadge}>
-                    <Feather name="alert-circle" size={12} color="#DC2626" />
-                    <Text style={styles.severityText}>high</Text>
-                  </View>
+          {/* Error State */}
+          {!loading && error && (
+            <View style={styles.errorBox}>
+              <Feather name="wifi-off" size={24} color="#DC2626" />
+              <Text style={styles.errorText}>{error}</Text>
+              <TouchableOpacity style={styles.retryBtn} onPress={analyzeAllergens}>
+                <Text style={styles.retryBtnText}>Retry</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* Results */}
+          {!loading && result && (
+            <>
+              {/* Summary Banner */}
+              <View style={[styles.summaryBanner, { backgroundColor: result.safeForUser ? '#F0FDF4' : '#FEF2F2', borderColor: result.safeForUser ? '#BBF7D0' : '#FECDD3' }]}>
+                <Feather name={result.safeForUser ? 'check-circle' : 'alert-triangle'} size={20} color={result.safeForUser ? '#059669' : '#DC2626'} />
+                <View style={styles.summaryText}>
+                  <Text style={[styles.summaryTitle, { color: result.safeForUser ? '#166534' : '#991B1B' }]}>
+                    {result.totalAllergens === 0 ? '✓ No allergens detected' : `⚠️ ${result.totalAllergens} allergen${result.totalAllergens !== 1 ? 's' : ''} detected`}
+                  </Text>
+                  <Text style={[styles.summarySub, { color: result.safeForUser ? '#166534' : '#991B1B' }]}>
+                    {result.summary}
+                  </Text>
                 </View>
-                <Text style={styles.allergenDescription}>
-                  {allergen.description}
-                </Text>
               </View>
-            </View>
-          ))}
+
+              {/* No allergens */}
+              {result.detectedAllergens.length === 0 && (
+                <View style={styles.noAllergensBox}>
+                  <Text style={styles.noAllergensEmoji}>🎉</Text>
+                  <Text style={styles.noAllergensTitle}>This recipe appears allergen-free!</Text>
+                  <Text style={styles.noAllergensText}>
+                    No common allergens were detected in the ingredients list.
+                  </Text>
+                </View>
+              )}
+
+              {/* Allergen Cards */}
+              {result.detectedAllergens.map((allergen, idx) => {
+                const s = SEVERITY_STYLES[allergen.severity] || SEVERITY_STYLES.low;
+                const color = SEVERITY_COLOR[allergen.severity] || '#059669';
+                return (
+                  <View key={idx} style={[styles.allergenCard, { backgroundColor: s.bg, borderColor: s.border }]}>
+                    <View style={styles.allergenCardTop}>
+                      <View style={[styles.allergenEmojiBubble, { backgroundColor: s.badge }]}>
+                        <Text style={styles.allergenEmoji}>{allergen.emoji}</Text>
+                      </View>
+                      <View style={styles.allergenInfo}>
+                        <View style={styles.allergenTitleRow}>
+                          <Text style={[styles.allergenName, { color: s.text }]}>{allergen.name}</Text>
+                          {allergen.affectsUser && (
+                            <View style={styles.youBadge}>
+                              <Text style={styles.youBadgeText}>⚠️ Affects You</Text>
+                            </View>
+                          )}
+                        </View>
+                        <View style={[styles.severityBadge, { backgroundColor: s.badge }]}>
+                          <View style={[styles.severityDot, { backgroundColor: color }]} />
+                          <Text style={[styles.severityText, { color }]}>
+                            {allergen.severity.charAt(0).toUpperCase() + allergen.severity.slice(1)} Risk
+                          </Text>
+                        </View>
+                      </View>
+                    </View>
+
+                    <Text style={[styles.allergenDesc, { color: s.text }]}>{allergen.description}</Text>
+
+                    {allergen.triggerIngredients.length > 0 && (
+                      <View style={styles.triggerRow}>
+                        <Text style={[styles.triggerLabel, { color: s.text }]}>Found in: </Text>
+                        <Text style={[styles.triggerIngredients, { color: s.text }]}>
+                          {allergen.triggerIngredients.join(', ')}
+                        </Text>
+                      </View>
+                    )}
+
+                    <TouchableOpacity
+                      style={[styles.substituteBtn, { borderColor: color }]}
+                      onPress={() => handleGetSubstitution(allergen)}
+                    >
+                      <Feather name="refresh-cw" size={14} color={color} />
+                      <Text style={[styles.substituteBtnText, { color }]}>
+                        Get AI Substitutions for {allergen.name}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                );
+              })}
+
+              {/* Ingredients scanned */}
+              {ingredientsList.length > 0 && (
+                <View style={styles.ingredientsScanned}>
+                  <Text style={styles.ingredientsScannedTitle}>
+                    <Feather name="search" size={13} color="#6B7280" /> Ingredients Scanned ({ingredientsList.length})
+                  </Text>
+                  <Text style={styles.ingredientsScannedList}>
+                    {ingredientsList.join(' · ')}
+                  </Text>
+                </View>
+              )}
+            </>
+          )}
         </View>
-
-        {/* Only show allergens and allow seeing substitutions */}
-        <TouchableOpacity
-          style={styles.substitutionsButton}
-          onPress={handleSeeSubstitutions}
-        >
-          <Text style={styles.substitutionsButtonText}>See Substitutions</Text>
-        </TouchableOpacity>
-
-        <View style={styles.bottomSpacer} />
       </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#F9FAFB",
-  },
+  container: { flex: 1, backgroundColor: '#F9FAFB' },
   header: {
-    backgroundColor: "#3C2253",
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 16,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    elevation: 4,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    backgroundColor: '#3C2253', paddingHorizontal: 16,
+    paddingTop: 50, paddingBottom: 16,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
   },
-  backButton: {
-    padding: 4,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#fff",
-    flex: 1,
-    marginLeft: 16,
-  },
-  headerSpacer: {
-    width: 32,
-  },
-  cartButton: {
-    padding: 6,
-    marginRight: 2,
-  },
-  cartBadge: {
-    position: 'absolute',
-    top: -6,
-    right: -6,
-    backgroundColor: '#FF6B6B',
-    borderRadius: 10,
-    minWidth: 18,
-    height: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 4,
-  },
-  cartBadgeText: { color: '#fff', fontSize: 11, fontWeight: '700' },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingBottom: 24,
-  },
-  recipeCard: {
-    margin: 16,
-    marginBottom: 0,
-    borderRadius: 16,
-    overflow: "hidden",
-    backgroundColor: "#fff",
-    elevation: 2,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-  },
-  recipeImage: {
-    width: "100%",
-    height: 180,
-  },
-  recipeInfo: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 8,
-  },
-  recipeTitle: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#111827",
-    marginBottom: 10,
-  },
-  recipeDetails: {
-    flexDirection: "row",
-    gap: 16,
-  },
-  detailItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  detailText: {
-    fontSize: 13,
-    color: "#6B7280",
-    fontWeight: "500",
-  },
-  allergenAlert: {
-    marginHorizontal: 16,
-    marginTop: 16,
-    marginBottom: 12,
-    backgroundColor: "#FEF2F2",
-    borderLeftWidth: 4,
-    borderLeftColor: "#DC2626",
-    padding: 12,
-    borderRadius: 8,
-  },
-  allergenAlertHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  allergenAlertText: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#991B1B",
-  },
-  allergensList: {
-    paddingHorizontal: 16,
-    gap: 12,
-    marginBottom: 24,
-  },
-  allergenCard: {
-    backgroundColor: "#FFF1F2",
-    borderRadius: 12,
-    padding: 16,
-    flexDirection: "row",
-    gap: 12,
-    borderWidth: 1,
-    borderColor: "#FECDD3",
-  },
-  allergenIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: "#FFE4E6",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  allergenEmoji: {
-    fontSize: 24,
-  },
-  allergenContent: {
-    flex: 1,
-  },
-  allergenHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 6,
-  },
-  allergenName: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#BE123C",
-  },
-  severityBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    backgroundColor: "#FEE2E2",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  severityText: {
-    fontSize: 11,
-    fontWeight: "600",
-    color: "#DC2626",
-  },
-  allergenDescription: {
-    fontSize: 13,
-    color: "#9F1239",
-    lineHeight: 18,
-  },
-  ingredientsSection: {
-    paddingHorizontal: 16,
-    marginBottom: 20,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#111827",
-    marginBottom: 16,
-  },
-  ingredientCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 2,
-    borderColor: "#E5E7EB",
-  },
-  ingredientCardSelected: {
-    borderColor: "#3C2253",
-    backgroundColor: "#F0EFFF",
-  },
-  checkbox: {
-    width: 24,
-    height: 24,
-    borderRadius: 6,
-    borderWidth: 2,
-    borderColor: "#3C2253",
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: 12,
-    backgroundColor: "#fff",
-  },
-  checkboxSelected: {
-    backgroundColor: "#3C2253",
-  },
-  ingredientInfo: {
-    flex: 1,
-  },
-  ingredientName: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#111827",
-    marginBottom: 4,
-  },
-  ingredientCategory: {
-    fontSize: 13,
-    color: "#6B7280",
-  },
-  ingredientPrice: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#3C2253",
-  },
-  addToCartButton: {
-    backgroundColor: "#3C2253",
-    marginHorizontal: 16,
-    marginTop: 20,
-    paddingVertical: 16,
-    borderRadius: 12,
-    alignItems: "center",
-    flexDirection: "row",
-    justifyContent: "center",
-    gap: 8,
-    elevation: 2,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-  },
-  addToCartButtonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  substitutionsButton: {
-    backgroundColor: "#3C2253",
-    marginHorizontal: 16,
-    marginTop: 12,
-    paddingVertical: 16,
-    borderRadius: 12,
-    alignItems: "center",
-    elevation: 2,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-  },
-  substitutionsButtonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  bottomSpacer: {
-    height: 8,
-  },
-});
+  backButton: { padding: 8 },
+  headerTitle: { fontSize: 18, fontWeight: 'bold', color: '#fff' },
+  placeholder: { width: 40 },
 
+  scrollView: { flex: 1 },
+  scrollContent: { paddingBottom: 32 },
+
+  recipeImage: { width: '100%', height: 200 },
+
+  content: { padding: 20 },
+
+  aiBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: '#F5F3FF', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5,
+    alignSelf: 'flex-start', marginBottom: 10, borderWidth: 1, borderColor: '#DDD6FE',
+  },
+  aiBadgeText: { fontSize: 12, color: '#7C3AED', fontWeight: '600' },
+
+  recipeTitle: { fontSize: 22, fontWeight: 'bold', color: '#1F2937', marginBottom: 20, lineHeight: 28 },
+
+  loadingBox: {
+    alignItems: 'center', backgroundColor: '#fff', borderRadius: 16, padding: 32,
+    marginBottom: 20, gap: 12,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6,
+    elevation: 2,
+  },
+  loadingTitle: { fontSize: 16, fontWeight: '700', color: '#1F2937' },
+  loadingSubtitle: { fontSize: 13, color: '#6B7280', textAlign: 'center', lineHeight: 18 },
+
+  errorBox: {
+    alignItems: 'center', backgroundColor: '#FEF2F2', borderRadius: 14, padding: 24,
+    marginBottom: 20, gap: 12, borderWidth: 1, borderColor: '#FECDD3',
+  },
+  errorText: { fontSize: 14, color: '#991B1B', textAlign: 'center' },
+  retryBtn: {
+    backgroundColor: '#DC2626', paddingHorizontal: 24, paddingVertical: 10, borderRadius: 20,
+  },
+  retryBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+
+  summaryBanner: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: 12,
+    borderWidth: 1.5, borderRadius: 14, padding: 16, marginBottom: 20,
+  },
+  summaryText: { flex: 1 },
+  summaryTitle: { fontSize: 15, fontWeight: '700', marginBottom: 4 },
+  summarySub: { fontSize: 13, lineHeight: 18 },
+
+  noAllergensBox: {
+    alignItems: 'center', backgroundColor: '#F0FDF4', borderRadius: 16, padding: 28,
+    marginBottom: 20, borderWidth: 1, borderColor: '#BBF7D0',
+  },
+  noAllergensEmoji: { fontSize: 40, marginBottom: 10 },
+  noAllergensTitle: { fontSize: 18, fontWeight: '700', color: '#166534', marginBottom: 6 },
+  noAllergensText: { fontSize: 13, color: '#166534', textAlign: 'center', lineHeight: 18 },
+
+  allergenCard: {
+    borderRadius: 14, borderWidth: 1.5, padding: 16, marginBottom: 14,
+  },
+  allergenCardTop: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 10 },
+  allergenEmojiBubble: {
+    width: 48, height: 48, borderRadius: 24,
+    alignItems: 'center', justifyContent: 'center', marginRight: 12,
+  },
+  allergenEmoji: { fontSize: 24 },
+  allergenInfo: { flex: 1 },
+  allergenTitleRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 6 },
+  allergenName: { fontSize: 16, fontWeight: '700' },
+  youBadge: {
+    backgroundColor: '#FEE2E2', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10,
+  },
+  youBadgeText: { fontSize: 11, fontWeight: '700', color: '#DC2626' },
+  severityBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    paddingHorizontal: 10, paddingVertical: 3, borderRadius: 12, alignSelf: 'flex-start',
+  },
+  severityDot: { width: 7, height: 7, borderRadius: 4 },
+  severityText: { fontSize: 12, fontWeight: '600' },
+
+  allergenDesc: { fontSize: 13, lineHeight: 18, marginBottom: 10 },
+
+  triggerRow: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 12 },
+  triggerLabel: { fontSize: 12, fontWeight: '600' },
+  triggerIngredients: { fontSize: 12, flex: 1 },
+
+  substituteBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    borderWidth: 1.5, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8,
+    alignSelf: 'flex-start',
+  },
+  substituteBtnText: { fontSize: 13, fontWeight: '600' },
+
+  ingredientsScanned: {
+    backgroundColor: '#fff', borderRadius: 12, padding: 14, marginTop: 4,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 3,
+    elevation: 1,
+  },
+  ingredientsScannedTitle: { fontSize: 13, fontWeight: '600', color: '#6B7280', marginBottom: 8 },
+  ingredientsScannedList: { fontSize: 12, color: '#9CA3AF', lineHeight: 18 },
+});
