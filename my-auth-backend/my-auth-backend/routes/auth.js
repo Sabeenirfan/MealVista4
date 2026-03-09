@@ -40,8 +40,8 @@ router.post('/signup', async (req, res) => {
     const existingUser = await User.findOne({ email: trimmedEmail });
     if (existingUser) {
       if (existingUser.isDeleted) {
-        return res.status(400).json({ 
-          message: 'This email was previously registered and cannot be used again' 
+        return res.status(400).json({
+          message: 'This email was previously registered and cannot be used again'
         });
       }
       return res.status(400).json({ message: 'Email already registered' });
@@ -108,8 +108,8 @@ router.post('/login', async (req, res) => {
     // Check if account is locked
     if (user.accountLockedUntil && user.accountLockedUntil > new Date()) {
       const minutesLeft = Math.ceil((user.accountLockedUntil - new Date()) / 60000);
-      return res.status(403).json({ 
-        message: `Account locked due to too many failed login attempts. Try again in ${minutesLeft} minute(s)` 
+      return res.status(403).json({
+        message: `Account locked due to too many failed login attempts. Try again in ${minutesLeft} minute(s)`
       });
     }
 
@@ -122,8 +122,8 @@ router.post('/login', async (req, res) => {
 
     // Check if user registered with Google
     if (!user.password) {
-      return res.status(400).json({ 
-        message: 'Please login with Google' 
+      return res.status(400).json({
+        message: 'Please login with Google'
       });
     }
 
@@ -137,14 +137,14 @@ router.post('/login', async (req, res) => {
       if (user.failedLoginAttempts >= 3) {
         user.accountLockedUntil = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
         await user.save();
-        return res.status(403).json({ 
-          message: 'Account locked due to 3 failed login attempts. Try again in 15 minutes or reset your password.' 
+        return res.status(403).json({
+          message: 'Account locked due to 3 failed login attempts. Try again in 15 minutes or reset your password.'
         });
       }
 
       await user.save();
       const attemptsLeft = 3 - user.failedLoginAttempts;
-      return res.status(401).json({ 
+      return res.status(401).json({
         message: `Invalid email or password. ${attemptsLeft} attempt(s) remaining`,
         attemptsRemaining: attemptsLeft
       });
@@ -189,7 +189,7 @@ router.get('/me', auth, async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    res.json({ 
+    res.json({
       user: {
         id: user._id,
         name: user.name,
@@ -202,7 +202,13 @@ router.get('/me', auth, async (req, res) => {
         height: user.height,
         weight: user.weight,
         bmi: user.bmi,
-        bmiCategory: user.bmiCategory
+        bmiCategory: user.bmiCategory,
+        healthGoal: user.healthGoal,
+        exerciseLevel: user.exerciseLevel,
+        age: user.age,
+        gender: user.gender,
+        dailyCalorieTarget: user.dailyCalorieTarget,
+        onboardingComplete: user.onboardingComplete || false
       }
     });
   } catch (error) {
@@ -210,90 +216,78 @@ router.get('/me', auth, async (req, res) => {
   }
 });
 
+// Helper: Mifflin-St Jeor daily calorie calculation
+function calculateDailyCalories(user) {
+  const { weight, height, age, gender, exerciseLevel, healthGoal } = user;
+  if (!weight || !height) return null;
+  const w = Number(weight), h = Number(height), a = Number(age) || 25;
+  let bmr = gender === 'female'
+    ? 10 * w + 6.25 * h - 5 * a - 161
+    : 10 * w + 6.25 * h - 5 * a + 5;
+  const activityMap = { low: 1.2, moderate: 1.55, high: 1.725 };
+  let tdee = bmr * (activityMap[exerciseLevel] || 1.55);
+  if (healthGoal === 'weight_loss') tdee -= 500;
+  else if (healthGoal === 'weight_gain') tdee += 500;
+  return Math.round(tdee);
+}
+
 // UPDATE PROFILE
 router.put('/me', auth, async (req, res) => {
   try {
-    const { name, email, dietaryPreferences, allergens, height, weight, bmi, bmiCategory, healthGoal } = req.body;
+    const {
+      name, email, dietaryPreferences, allergens,
+      height, weight, bmi, bmiCategory, healthGoal,
+      exerciseLevel, age, gender, onboardingComplete
+    } = req.body;
 
     const user = await User.findOne({ _id: req.userId, isDeleted: { $ne: true } });
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
-    }
+    if (!user) return res.status(404).json({ message: 'User not found' });
 
-    // Update name if provided
     if (name !== undefined) {
       const trimmedName = String(name || '').trim();
-      if (!trimmedName) {
-        return res.status(400).json({ message: 'Name cannot be empty' });
-      }
+      if (!trimmedName) return res.status(400).json({ message: 'Name cannot be empty' });
       user.name = trimmedName;
     }
 
-    // Update email if provided
     if (email !== undefined) {
       const trimmedEmail = String(email || '').trim().toLowerCase();
-      if (!trimmedEmail) {
-        return res.status(400).json({ message: 'Email cannot be empty' });
-      }
-      
-      if (!gmailRegex.test(trimmedEmail)) {
-        return res.status(400).json({ message: 'Email must be a valid Gmail address' });
-      }
-
-      // Check if email is already taken by another user
-      const existingUser = await User.findOne({ 
-        email: trimmedEmail, 
-        _id: { $ne: req.userId },
-        isDeleted: { $ne: true }
-      });
-      if (existingUser) {
-        return res.status(400).json({ message: 'Email already registered' });
-      }
-
+      if (!trimmedEmail) return res.status(400).json({ message: 'Email cannot be empty' });
+      if (!gmailRegex.test(trimmedEmail)) return res.status(400).json({ message: 'Email must be a valid Gmail address' });
+      const existingUser = await User.findOne({ email: trimmedEmail, _id: { $ne: req.userId }, isDeleted: { $ne: true } });
+      if (existingUser) return res.status(400).json({ message: 'Email already registered' });
       user.email = trimmedEmail;
     }
 
-    // Update dietary preferences if provided
-    if (dietaryPreferences !== undefined) {
-      user.dietaryPreferences = Array.isArray(dietaryPreferences) ? dietaryPreferences : [];
-    }
+    if (dietaryPreferences !== undefined) user.dietaryPreferences = Array.isArray(dietaryPreferences) ? dietaryPreferences : [];
+    if (allergens !== undefined) user.allergens = Array.isArray(allergens) ? allergens : [];
+    if (height !== undefined) user.height = height ? Number(height) : null;
+    if (weight !== undefined) user.weight = weight ? Number(weight) : null;
+    if (bmi !== undefined) user.bmi = bmi ? Number(bmi) : null;
+    if (bmiCategory !== undefined) user.bmiCategory = bmiCategory || null;
 
-    // Update allergens if provided
-    if (allergens !== undefined) {
-      user.allergens = Array.isArray(allergens) ? allergens : [];
-    }
-
-    // Update height if provided
-    if (height !== undefined) {
-      user.height = height ? Number(height) : null;
-    }
-
-    // Update weight if provided
-    if (weight !== undefined) {
-      user.weight = weight ? Number(weight) : null;
-    }
-
-    // Update BMI if provided
-    if (bmi !== undefined) {
-      user.bmi = bmi ? Number(bmi) : null;
-    }
-
-    // Update BMI category if provided
-    if (bmiCategory !== undefined) {
-      user.bmiCategory = bmiCategory || null;
-    }
-
-    // Update health goal if provided
     if (healthGoal !== undefined) {
-      if (healthGoal && !['weight_loss', 'weight_gain', 'maintenance'].includes(healthGoal)) {
-        return res.status(400).json({ message: 'Invalid health goal. Must be weight_loss, weight_gain, or maintenance' });
-      }
+      if (healthGoal && !['weight_loss', 'weight_gain', 'maintenance'].includes(healthGoal))
+        return res.status(400).json({ message: 'Invalid health goal' });
       user.healthGoal = healthGoal || null;
     }
 
+    if (exerciseLevel !== undefined) {
+      if (exerciseLevel && !['low', 'moderate', 'high'].includes(exerciseLevel))
+        return res.status(400).json({ message: 'Invalid exercise level' });
+      user.exerciseLevel = exerciseLevel || null;
+    }
+
+    if (age !== undefined) user.age = age ? Number(age) : null;
+    if (gender !== undefined) user.gender = gender || null;
+    if (onboardingComplete !== undefined) user.onboardingComplete = Boolean(onboardingComplete);
+
+    // Auto-calculate daily calorie target whenever any relevant field changes
+    const newCalories = calculateDailyCalories(user);
+    if (newCalories) user.dailyCalorieTarget = newCalories;
+
     await user.save();
 
-    res.json({ 
+    res.json({
       message: 'Profile updated successfully',
       user: {
         id: user._id,
@@ -307,7 +301,13 @@ router.put('/me', auth, async (req, res) => {
         height: user.height,
         weight: user.weight,
         bmi: user.bmi,
-        bmiCategory: user.bmiCategory
+        bmiCategory: user.bmiCategory,
+        healthGoal: user.healthGoal,
+        exerciseLevel: user.exerciseLevel,
+        age: user.age,
+        gender: user.gender,
+        dailyCalorieTarget: user.dailyCalorieTarget,
+        onboardingComplete: user.onboardingComplete || false
       }
     });
   } catch (error) {

@@ -1,44 +1,50 @@
 import { Stack } from "expo-router";
 import { CartProvider } from "../contexts/CartContext";
 import { FavoritesProvider } from "../contexts/FavoritesContext";
+import { MealPlanProvider } from "../contexts/MealPlanContext";
 
 export default function Layout() {
   return (
     <CartProvider>
       <FavoritesProvider>
-        <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="index" /> {/* Splash */}
-          <Stack.Screen name="signup" /> {/* Sign Up */}
-          <Stack.Screen name="signIn" /> {/* Sign In */}
-          <Stack.Screen name="forgotPassword" /> {/* Forgot Password */}
-          <Stack.Screen name="verifyOTP" /> {/* Verify OTP */}
-          <Stack.Screen name="verifyEmailOTP" /> {/* Verify Email OTP */}
-          <Stack.Screen name="resetPassword" /> {/* Reset Password */}
-          <Stack.Screen name="googleSignIn" /> {/* Google Sign In */}
-          <Stack.Screen name="dietaryPreference" /> {/* Dietary Preference */}
-          <Stack.Screen name="bmiCalculator" /> {/* BMI Calculator */}
-          <Stack.Screen name="healthGoal" /> {/* Health Goal */}
-          <Stack.Screen name="allergenPreference" /> {/* Allergen Preference */}
-          <Stack.Screen name="home" /> {/* Home Screen */}
-          <Stack.Screen name="search" /> {/* AI Search Screen */}
-          <Stack.Screen name="profile" /> {/* Profile Screen */}
-          <Stack.Screen name="favorites" /> {/* Favorites */}
-          <Stack.Screen name="editProfile" /> {/* Edit Profile */}
-          <Stack.Screen name="recipeDetails" /> {/* Recipe Details */}
-          <Stack.Screen name="instructions" /> {/* Instructions */}
-          <Stack.Screen name="nutritionalBreakdown" /> {/* Nutritional Breakdown */}
-          <Stack.Screen name="macronutrients" /> {/* Macronutrients */}
-          <Stack.Screen name="micronutrients" /> {/* Micronutrients */}
-          <Stack.Screen name="seeAllergens" /> {/* See Allergens */}
-          <Stack.Screen name="saveSubstitution" /> {/* Save Substitution */}
-          <Stack.Screen name="viewCart" /> {/* View Cart */}
-          <Stack.Screen name="checkoutSummary" /> {/* Checkout Summary */}
-          <Stack.Screen name="paymentMethod" /> {/* Payment Method */}
-          <Stack.Screen name="cardDetails" /> {/* Card Details */}
-          <Stack.Screen name="paymentSuccessful" /> {/* Payment Successful */}
-          <Stack.Screen name="orderHistory" /> {/* Order History */}
-          <Stack.Screen name="admin" /> {/* Admin Panel */}
-        </Stack>
+        <MealPlanProvider>
+          <Stack screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="index" />
+            <Stack.Screen name="signup" />
+            <Stack.Screen name="signIn" />
+            <Stack.Screen name="forgotPassword" />
+            <Stack.Screen name="verifyOTP" />
+            <Stack.Screen name="verifyEmailOTP" />
+            <Stack.Screen name="resetPassword" />
+            <Stack.Screen name="googleSignIn" />
+            <Stack.Screen name="dietaryPreference" />
+            <Stack.Screen name="bmiCalculator" />
+            <Stack.Screen name="healthGoal" />
+            <Stack.Screen name="allergenPreference" />
+            <Stack.Screen name="home" />
+            <Stack.Screen name="search" />
+            <Stack.Screen name="profile" />
+            <Stack.Screen name="favorites" />
+            <Stack.Screen name="editProfile" />
+            <Stack.Screen name="recipeDetails" />
+            <Stack.Screen name="instructions" />
+            <Stack.Screen name="nutritionalBreakdown" />
+            <Stack.Screen name="macronutrients" />
+            <Stack.Screen name="micronutrients" />
+            <Stack.Screen name="seeAllergens" />
+            <Stack.Screen name="saveSubstitution" />
+            <Stack.Screen name="viewCart" />
+            <Stack.Screen name="checkoutSummary" />
+            <Stack.Screen name="paymentMethod" />
+            <Stack.Screen name="cardDetails" />
+            <Stack.Screen name="paymentSuccessful" />
+            <Stack.Screen name="orderHistory" />
+            <Stack.Screen name="ingredientCatalog" />
+            <Stack.Screen name="mealPlan" />
+            <Stack.Screen name="bmiAnalytics" />
+            <Stack.Screen name="admin" />
+          </Stack>
+        </MealPlanProvider>
       </FavoritesProvider>
     </CartProvider>
   );

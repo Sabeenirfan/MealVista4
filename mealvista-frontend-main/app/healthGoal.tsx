@@ -8,7 +8,7 @@ import {
   ScrollView,
   Alert,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { getProfile, updateProfile } from '../lib/authService';
 
@@ -38,6 +38,7 @@ const healthGoals = [
 
 export default function HealthGoalScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams();
   const [selectedGoal, setSelectedGoal] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -65,24 +66,12 @@ export default function HealthGoalScreen() {
     try {
       setLoading(true);
       await updateProfile({ healthGoal: selectedGoal as any });
-      
-      Alert.alert(
-        'Success',
-        'Health goal saved successfully! Your recipe recommendations will now be personalized.',
-        [
-          {
-            text: 'OK',
-            onPress: () => {
-              const params = router.useLocalSearchParams();
-              if (params.onboarding === 'true') {
-                router.replace('/home');
-              } else {
-                router.back();
-              }
-            },
-          },
-        ]
-      );
+
+      if (params.onboarding === 'true') {
+        router.push('/exerciseLevel' as any);
+      } else {
+        router.back();
+      }
     } catch (error: any) {
       console.error('Error saving health goal:', error);
       Alert.alert(
@@ -97,7 +86,7 @@ export default function HealthGoalScreen() {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#3C2253" />
-      
+
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>

@@ -77,7 +77,7 @@ const fetchNutritionFromUSDA = async (ingredient) => {
         pageSize: 1,
         api_key: USDA_API_KEY,
       },
-      timeout: 3000,
+      timeout: 10000,
     });
 
     if (response.data.foods && response.data.foods[0]) {
@@ -86,7 +86,7 @@ const fetchNutritionFromUSDA = async (ingredient) => {
 
       food.foodNutrients?.forEach(nutrient => {
         const nutrientName = nutrient.nutrientName?.toLowerCase() || '';
-        
+
         if (nutrientName.includes('energy') && nutrientName.includes('kcal')) {
           nutrients.calories = Math.round(nutrient.value || 0);
         } else if (nutrientName.includes('protein')) {
@@ -121,7 +121,7 @@ const fetchNutritionFromUSDA = async (ingredient) => {
  */
 const generateFallbackNutrition = (ingredient) => {
   const ing = ingredient.toLowerCase();
-  
+
   if (ing.includes('chicken') || ing.includes('meat') || ing.includes('beef') || ing.includes('fish')) {
     return { calories: 165, protein: 26, carbs: 0, fat: 7, fiber: 0, calcium: 11, iron: 1, vitaminA: 6, vitaminC: 0 };
   } else if (ing.includes('tomato') || ing.includes('onion') || ing.includes('garlic') || ing.includes('pepper')) {
@@ -158,15 +158,15 @@ const calculateNutrition = async (ingredients) => {
   // Process all ingredients (not just first 8) to get accurate nutrition
   for (const ingredient of ingredients) {
     if (!ingredient || !ingredient.trim()) continue;
-    
+
     // Extract quantity and ingredient name
     // Format: "2 cups rice" or "500g chicken" or "1 tsp salt"
     const parts = ingredient.trim().match(/^([\d.\/]+)\s*(cup|cups|tbsp|tbsp|tsp|tsp|g|kg|oz|ml|l|pinch|dash|slice|slices|clove|cloves|piece|pieces|lb|pound|pounds)?\s*(.*)$/i);
-    
+
     let quantity = 1;
     let unit = '';
     let ingredientName = ingredient.toLowerCase();
-    
+
     if (parts) {
       // Parse quantity (handle fractions like "1/2")
       const qtyStr = parts[1];
@@ -182,18 +182,18 @@ const calculateNutrition = async (ingredients) => {
       // No quantity found, extract ingredient name
       ingredientName = ingredient.replace(/^\d+\s*(?:cup|cups|tbsp|tsp|g|kg|oz|ml|l|pinch|dash|slice|slices|clove|cloves)?s?\s+/i, '').toLowerCase().trim();
     }
-    
+
     if (!ingredientName) continue;
-    
+
     // Fetch REAL nutrition data from USDA
     let nutrition = await fetchNutritionFromUSDA(ingredientName);
-    
+
     if (!nutrition) {
       // Only use fallback if USDA fails - but mark it as estimated
       nutrition = generateFallbackNutrition(ingredientName);
       console.log(`⚠️  Using estimated nutrition for: ${ingredientName}`);
     }
-    
+
     // Convert quantity to standard serving size (100g equivalent)
     // Approximate conversions for common units
     let multiplier = quantity;
@@ -222,10 +222,10 @@ const calculateNutrition = async (ingredients) => {
       else if (ingredientName.includes('clove') || ingredientName.includes('garlic')) multiplier = 3; // 1 clove ≈ 3g
       else multiplier = 100; // Default: assume 100g
     }
-    
+
     // Calculate nutrition based on actual quantity (per 100g basis)
     const servingMultiplier = multiplier / 100;
-    
+
     total.calories += Math.round((nutrition.calories || 0) * servingMultiplier);
     total.protein += Math.round((nutrition.protein || 0) * servingMultiplier);
     total.carbs += Math.round((nutrition.carbs || 0) * servingMultiplier);
@@ -263,7 +263,7 @@ const transformMeal = async (meal) => {
       // Preserve EXACT format from TheMealDB: "measure ingredient"
       // e.g., "500g chicken", "2 cups rice", "1 tsp salt"
       // TheMealDB provides REAL quantities from actual recipes
-      const formatted = measure && measure.trim() 
+      const formatted = measure && measure.trim()
         ? `${measure.trim()} ${ingredient.trim()}`.trim()
         : ingredient.trim();
       ingredients.push(formatted);
@@ -280,7 +280,7 @@ const transformMeal = async (meal) => {
       .split(/\r\n|\n|\.(?=\s+[A-Z])|(?=\d+\.)/)
       .map(step => step.trim())
       .filter(step => step.length > 10); // Filter out very short fragments
-    
+
     steps.forEach((step, index) => {
       if (step.trim() && step.length > 10) {
         instructions.push({
@@ -290,7 +290,7 @@ const transformMeal = async (meal) => {
       }
     });
   }
-  
+
   // TheMealDB always provides instructions, but if somehow missing, return empty
   // This ensures we ONLY show REAL instructions from actual recipe sources
 
@@ -299,12 +299,12 @@ const transformMeal = async (meal) => {
   const instructionCount = instructions.length;
   const estimatedPrepTime = Math.max(5, Math.min(30, instructionCount * 2)); // 2 min per step, min 5, max 30
   const estimatedCookTime = Math.max(15, Math.min(90, instructionCount * 5)); // 5 min per step, min 15, max 90
-  
+
   // Determine difficulty based on instruction count (realistic)
   let difficulty = 'Easy';
   if (instructionCount > 8) difficulty = 'Hard';
   else if (instructionCount > 5) difficulty = 'Medium';
-  
+
   return {
     id: `recipe-${meal.idMeal}`,
     name: meal.strMeal,
@@ -338,8 +338,8 @@ const transformMeal = async (meal) => {
       if (ing_lower.includes('fish') || ing_lower.includes('shrimp')) return 'fish';
       return null;
     }).filter(a => a !== null).slice(0, 3),
-    dietTypes: ingredients.some(i => i.toLowerCase().includes('meat') || i.toLowerCase().includes('chicken') || i.toLowerCase().includes('beef')) 
-      ? ['omnivore'] 
+    dietTypes: ingredients.some(i => i.toLowerCase().includes('meat') || i.toLowerCase().includes('chicken') || i.toLowerCase().includes('beef'))
+      ? ['omnivore']
       : ['vegetarian', 'vegan'],
     ingredients: ingredients, // Use ALL ingredients from recipe - preserve real quantities
     instructions: instructions,
@@ -352,7 +352,7 @@ const transformMeal = async (meal) => {
 const fetchMealsFromMealDB = async (cuisine) => {
   try {
     console.log(`🍽️  Fetching ${cuisine} meals from TheMealDB...`);
-    
+
     const mapping = mealDBCategoryMappings[cuisine];
     if (!mapping) {
       throw new Error(`No mapping found for cuisine: ${cuisine}`);
@@ -366,9 +366,9 @@ const fetchMealsFromMealDB = async (cuisine) => {
       try {
         const areaResponse = await axios.get(`${MEALDB_BASE_URL}/filter.php`, {
           params: { a: mapping.area },
-          timeout: 8000,
+          timeout: 30000,
         });
-        
+
         if (areaResponse.data.meals) {
           for (const meal of areaResponse.data.meals.slice(0, 15)) {
             if (!seenMealIds.has(meal.idMeal)) {
@@ -387,9 +387,9 @@ const fetchMealsFromMealDB = async (cuisine) => {
       try {
         const categoryResponse = await axios.get(`${MEALDB_BASE_URL}/filter.php`, {
           params: { c: mapping.category },
-          timeout: 8000,
+          timeout: 30000,
         });
-        
+
         if (categoryResponse.data.meals) {
           for (const meal of categoryResponse.data.meals.slice(0, 10)) {
             if (!seenMealIds.has(meal.idMeal)) {
@@ -407,13 +407,13 @@ const fetchMealsFromMealDB = async (cuisine) => {
     if (allMeals.length < 8 && mapping.searchTerms) {
       for (const searchTerm of mapping.searchTerms.slice(0, 6)) {
         if (allMeals.length >= 8) break;
-        
+
         try {
           const searchResponse = await axios.get(`${MEALDB_BASE_URL}/search.php`, {
             params: { s: searchTerm },
-            timeout: 8000,
+            timeout: 30000,
           });
-          
+
           if (searchResponse.data.meals && searchResponse.data.meals.length > 0) {
             console.log(`✓ Found ${searchResponse.data.meals.length} meals for search: ${searchTerm}`);
             for (const meal of searchResponse.data.meals) {
@@ -459,7 +459,7 @@ const fetchMealsFromSpoonacular = async (cuisine) => {
         fillIngredients: true,
         apiKey: SPOONACULAR_API_KEY,
       },
-      timeout: 10000,
+      timeout: 30000,
     });
 
     const recipes = response.data.results || [];
@@ -474,7 +474,7 @@ const fetchMealsFromSpoonacular = async (cuisine) => {
         // Format: "500 g chicken" or "2 cups rice" - EXACT quantities from API
         return `${amount} ${unit} ${name}`.trim().replace(/\s+/g, ' ');
       }) || [];
-      
+
       // Fetch detailed recipe information for instructions
       let instructions = [];
       try {
@@ -483,9 +483,9 @@ const fetchMealsFromSpoonacular = async (cuisine) => {
             includeNutrition: true,
             apiKey: SPOONACULAR_API_KEY,
           },
-          timeout: 5000,
+          timeout: 20000,
         });
-        
+
         if (detailResponse.data.analyzedInstructions && detailResponse.data.analyzedInstructions[0]) {
           instructions = detailResponse.data.analyzedInstructions[0].steps.map((step, idx) => ({
             id: idx + 1,
@@ -508,25 +508,25 @@ const fetchMealsFromSpoonacular = async (cuisine) => {
         // Don't create fake instructions - only use REAL data from API
         console.log(`⚠️  No detailed instructions available for recipe ${recipe.id}`);
       }
-      
+
       // Get micronutrients from nutrition data
       const nutrition = recipe.nutrition?.nutrients || [];
       const getNutrient = (name) => Math.round(nutrition.find(n => n.name?.includes(name))?.amount || 0);
-      
+
       // Use REAL data from Spoonacular API
       const totalTime = recipe.readyInMinutes || 30;
       const prepTime = Math.max(5, Math.floor(totalTime * 0.3)); // 30% prep, 70% cook
       const cookTime = totalTime - prepTime;
-      
+
       // Determine difficulty based on total time (realistic)
       let difficulty = 'Easy';
       if (totalTime > 60) difficulty = 'Hard';
       else if (totalTime > 30) difficulty = 'Medium';
-      
+
       // Use REAL nutrition data from Spoonacular
       const energyNutrient = recipe.nutrition?.nutrients?.find(n => n.name === 'Calories' || n.name === 'Energy');
       const realCalories = energyNutrient ? Math.round(energyNutrient.amount) : 0;
-      
+
       return {
         id: `recipe-${recipe.id}`,
         name: recipe.title,
@@ -571,19 +571,19 @@ const fetchMealsFromSpoonacular = async (cuisine) => {
     console.error(`Error fetching from Spoonacular:`, error.message);
     // Fallback to TheMealDB if Spoonacular fails
     console.log(`⚠️  Falling back to TheMealDB for ${cuisine}...`);
-    
+
     try {
       const mealDBMeals = await fetchMealsFromMealDB(cuisine);
       const detailedMeals = [];
-      
+
       // Get detailed info for each meal
       for (const meal of mealDBMeals.slice(0, 8)) {
         try {
           const detailResponse = await axios.get(`${MEALDB_BASE_URL}/lookup.php`, {
             params: { i: meal.idMeal },
-            timeout: 5000,
+            timeout: 20000,
           });
-          
+
           if (detailResponse.data.meals && detailResponse.data.meals[0]) {
             const transformed = await transformMeal(detailResponse.data.meals[0]);
             detailedMeals.push(transformed);
@@ -592,7 +592,7 @@ const fetchMealsFromSpoonacular = async (cuisine) => {
           console.warn(`Failed to get details for meal ${meal.idMeal}`);
         }
       }
-      
+
       return detailedMeals;
     } catch (fallbackError) {
       console.error(`Fallback also failed:`, fallbackError.message);
@@ -634,7 +634,7 @@ router.get('/category/:category', async (req, res) => {
 
     let meals;
     let source = 'spoonacular';
-    
+
     try {
       meals = await fetchMealsFromSpoonacular(category);
     } catch (error) {
@@ -643,16 +643,16 @@ router.get('/category/:category', async (req, res) => {
       try {
         const mealDBMeals = await fetchMealsFromMealDB(category);
         const detailedMeals = [];
-        
+
         // Get detailed info for each meal
         console.log(`📋 Processing ${mealDBMeals.length} meals for ${category}...`);
         for (const meal of mealDBMeals.slice(0, 8)) {
           try {
             const detailResponse = await axios.get(`${MEALDB_BASE_URL}/lookup.php`, {
               params: { i: meal.idMeal },
-              timeout: 8000,
+              timeout: 20000,
             });
-            
+
             if (detailResponse.data.meals && detailResponse.data.meals[0]) {
               const transformed = await transformMeal(detailResponse.data.meals[0]);
               detailedMeals.push(transformed);
@@ -662,13 +662,13 @@ router.get('/category/:category', async (req, res) => {
             console.warn(`Failed to get details for meal ${meal.idMeal}:`, err.message);
           }
         }
-        
+
         if (detailedMeals.length === 0) {
           throw new Error(`No detailed meals could be fetched for ${category}`);
         }
-        
+
         console.log(`✅ Successfully processed ${detailedMeals.length} meals for ${category}`);
-        
+
         meals = detailedMeals;
         source = 'themealdb + usda';
       } catch (fallbackError) {
@@ -722,6 +722,191 @@ router.get('/categories', (req, res) => {
   }
 });
 
+const aiRecipeGenerator = require('../services/aiRecipeGenerator');
+const User = require('../models/User');
+const auth = require('../middleware/auth');
+const jwt = require('jsonwebtoken');
+
+// Cache for home screen recommendations (30 min per user)
+const recommendedCache = {};
+const seasonalCache = {};
+const HOME_CACHE_DURATION = 30 * 60 * 1000; // 30 minutes
+
+/**
+ * Helper: extract user profile from Authorization header (optional auth)
+ */
+async function getUserProfile(req) {
+  try {
+    const token = req.header('Authorization')?.replace('Bearer ', '');
+    if (!token) return null;
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const user = await User.findOne({ _id: decoded.userId, isDeleted: { $ne: true } });
+    if (!user) return null;
+    return {
+      userId: user._id.toString(),
+      name: user.name,
+      dietaryPreferences: user.dietaryPreferences || [],
+      allergens: user.allergens || [],
+      bmi: user.bmi,
+      bmiCategory: user.bmiCategory,
+      healthGoal: user.healthGoal || 'maintenance',
+      weight: user.weight,
+      height: user.height,
+      age: user.age,
+      gender: user.gender,
+      exerciseLevel: user.exerciseLevel,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Get current season based on date (Northern Hemisphere months)
+ */
+function getCurrentSeason() {
+  const month = new Date().getMonth() + 1;
+  if (month >= 3 && month <= 5) return 'Spring';
+  if (month >= 6 && month <= 8) return 'Summer';
+  if (month >= 9 && month <= 11) return 'Autumn';
+  return 'Winter';
+}
+
+// Cache duration: 24 hours (in milliseconds)
+const DB_CACHE_DURATION = 24 * 60 * 60 * 1000;
+
+/**
+ * GET /api/recipes/recommended
+ */
+router.get('/recommended', async (req, res) => {
+  try {
+    const userProfile = await getUserProfile(req);
+
+    // 1. Check Database Cache if user is logged in
+    if (userProfile?.userId) {
+      const userDoc = await User.findById(userProfile.userId).lean();
+      if (
+        userDoc &&
+        userDoc.cachedRecommendedMeals &&
+        userDoc.cachedRecommendedMeals.length > 0 &&
+        userDoc.lastRecipeCache &&
+        (Date.now() - new Date(userDoc.lastRecipeCache).getTime() < DB_CACHE_DURATION)
+      ) {
+        console.log(`✅ [Recommended] Serving from 24h DB cache for ${userProfile.userId}`);
+        return res.json({
+          success: true,
+          recipes: userDoc.cachedRecommendedMeals,
+          count: userDoc.cachedRecommendedMeals.length,
+          source: 'openai-gpt4o-mini',
+          cached: true
+        });
+      }
+    }
+
+    const profile = userProfile || { dietaryPreferences: [], allergens: [], bmi: 22, bmiCategory: 'Normal', healthGoal: 'maintenance' };
+
+    // ── Build base goal query ────────────────────────────────────────
+    let goalQuery = profile.healthGoal === 'weight_loss' ? 'light healthy low-calorie meal'
+      : profile.healthGoal === 'weight_gain' ? 'high protein calorie-dense nutritious meal'
+        : 'balanced nutritious meal';
+
+    // ── Enrich with behavior data if user is logged in ───────────────
+    if (userProfile?.userId) {
+      try {
+        const UserBehavior = require('../models/UserBehavior');
+        const behavior = await UserBehavior.findOne({ userId: userProfile.userId }).lean();
+
+        if (behavior) {
+          const recentSearches = behavior.searchHistory.slice(-3).map(s => s.query).filter(Boolean);
+          const topCooked = [...new Set(behavior.cookedRecipes.slice(-5).map(r => r.recipeName).filter(Boolean))];
+          const favorites = behavior.favoriteRecipes.slice(-3).map(r => r.recipeName).filter(Boolean);
+
+          if (recentSearches.length > 0) goalQuery += `. User recently searched for: ${recentSearches.join(', ')}`;
+          if (topCooked.length > 0) goalQuery += `. User enjoys cooking: ${topCooked.join(', ')}`;
+          if (favorites.length > 0) goalQuery += `. User favourites include: ${favorites.join(', ')}`;
+
+          console.log(`🧠 [Recommended] Behavior-enhanced query for ${userProfile.userId}`);
+        }
+      } catch (behaviorErr) {
+        console.warn('[Recommended] Could not load behavior data:', behaviorErr.message);
+      }
+    }
+
+    console.log(`🎯 [Recommended] Generating for user ${userProfile?.userId || 'guest'} (${profile.healthGoal}, BMI: ${profile.bmiCategory})`);
+    const recipes = await aiRecipeGenerator.generateRecipesForSearch(profile, goalQuery, 4);
+
+    // Save to Database Cache if user is logged in
+    if (userProfile?.userId && recipes.length > 0) {
+      await User.findByIdAndUpdate(userProfile.userId, {
+        $set: {
+          cachedRecommendedMeals: recipes,
+          lastRecipeCache: new Date()
+        }
+      });
+    }
+
+    res.json({ success: true, recipes, count: recipes.length, source: 'openai-gpt4o-mini', cached: false, personalizedFor: { healthGoal: profile.healthGoal, bmiCategory: profile.bmiCategory } });
+  } catch (error) {
+    console.error('[Recommended] Error:', error.message);
+    res.status(500).json({ success: false, message: 'Error generating recommended recipes', error: error.message });
+  }
+});
+
+/**
+ * GET /api/recipes/seasonal
+ */
+router.get('/seasonal', async (req, res) => {
+  try {
+    const userProfile = await getUserProfile(req);
+    const season = getCurrentSeason();
+
+    // 1. Check Database Cache if user is logged in
+    if (userProfile?.userId) {
+      const userDoc = await User.findById(userProfile.userId).lean();
+      if (
+        userDoc &&
+        userDoc.cachedSeasonalMeals &&
+        userDoc.cachedSeasonalMeals.length > 0 &&
+        userDoc.lastRecipeCache &&
+        (Date.now() - new Date(userDoc.lastRecipeCache).getTime() < DB_CACHE_DURATION)
+      ) {
+        console.log(`✅ [Seasonal] Serving from 24h DB cache for ${userProfile.userId}`);
+        return res.json({
+          success: true,
+          recipes: userDoc.cachedSeasonalMeals,
+          count: userDoc.cachedSeasonalMeals.length,
+          season,
+          source: 'openai-gpt4o-mini',
+          cached: true
+        });
+      }
+    }
+
+    const profile = userProfile || { dietaryPreferences: [], allergens: [], bmi: 22, bmiCategory: 'Normal', healthGoal: 'maintenance' };
+    const preferredCuisines = profile.dietaryPreferences.filter(p => ['pakistani', 'italian', 'chinese', 'mexican', 'thai', 'mediterranean', 'indian'].includes(p.toLowerCase()));
+    const cuisineContext = preferredCuisines.length > 0 ? preferredCuisines[Math.floor(Math.random() * preferredCuisines.length)] : ['Pakistani', 'Italian', 'Mediterranean'][Math.floor(Math.random() * 3)];
+    const seasonalQuery = `traditional ${season} ${cuisineContext} recipe`;
+
+    console.log(`🌿 [Seasonal] Generating ${season} recipes (cuisine: ${cuisineContext})`);
+    const recipes = await aiRecipeGenerator.generateRecipesForSearch(profile, seasonalQuery, 4);
+
+    // Save to Database Cache if user is logged in
+    if (userProfile?.userId && recipes.length > 0) {
+      await User.findByIdAndUpdate(userProfile.userId, {
+        $set: {
+          cachedSeasonalMeals: recipes,
+          lastRecipeCache: new Date()
+        }
+      });
+    }
+
+    res.json({ success: true, recipes, count: recipes.length, season, source: 'openai-gpt4o-mini', cached: false });
+  } catch (error) {
+    console.error('[Seasonal] Error:', error.message);
+    res.status(500).json({ success: false, message: 'Error generating seasonal recipes', error: error.message });
+  }
+});
+
 /**
  * GET /api/recipes/:id
  */
@@ -753,9 +938,6 @@ router.get('/:id', (req, res) => {
   }
 });
 
-const aiRecipeGenerator = require('../services/aiRecipeGenerator');
-const User = require('../models/User');
-const auth = require('../middleware/auth');
 
 /**
  * GET /api/recipes/search/:query
@@ -783,7 +965,7 @@ router.get('/search/:query', async (req, res) => {
         const jwt = require('jsonwebtoken');
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
         const user = await User.findOne({ _id: decoded.userId, isDeleted: { $ne: true } });
-        
+
         if (user) {
           userProfile = {
             dietaryPreferences: user.dietaryPreferences || [],
@@ -811,51 +993,18 @@ router.get('/search/:query', async (req, res) => {
       };
     }
 
-    // Generate AI-powered personalized recipes using AI's stored knowledge
-    console.log(`🎯 Generating AI recipes with stored knowledge for: "${query}"`);
+    // Generate AI-powered personalized recipes using OpenAI GPT-4o-mini
+    console.log(`🎯 Generating OpenAI recipes for: "${query}"`);
     console.log(`📊 User Profile: ${JSON.stringify(userProfile)}`);
-    
-    const aiRecipes = [];
-    
-    // Generate 5 personalized recipes using AI
-    // AI will use its stored knowledge to create recipes related to the search
-    const numRecipes = 5;
-    for (let i = 0; i < numRecipes; i++) {
-      try {
-        console.log(`🤖 Generating AI recipe ${i + 1}/${numRecipes}...`);
-        const recipe = await aiRecipeGenerator.generatePersonalizedRecipe(userProfile, query);
-        if (recipe) {
-          aiRecipes.push(recipe);
-          console.log(`✅ Generated: ${recipe.name}`);
-        }
-      } catch (err) {
-        console.warn(`⚠️  Failed to generate AI recipe ${i + 1}:`, err.message);
-        // Continue generating other recipes even if one fails
-      }
-    }
 
-    // Always ensure we have at least some recipes
-    // If AI completely fails, generate basic recipes from scratch
-    if (aiRecipes.length === 0) {
-      console.log('⚠️  AI generation returned no results, generating from scratch...');
-      for (let i = 0; i < 3; i++) {
-        try {
-          const recipe = await aiRecipeGenerator.generateFromScratch(userProfile, query);
-          if (recipe) {
-            aiRecipes.push(recipe);
-          }
-        } catch (err) {
-          console.warn(`Failed to generate from scratch:`, err.message);
-        }
-      }
-    }
+    const aiRecipes = await aiRecipeGenerator.generateRecipesForSearch(userProfile, query, 5);
 
     res.json({
       success: true,
       query,
       recipes: aiRecipes,
       count: aiRecipes.length,
-      source: aiRecipes.length > 0 && aiRecipes[0].isAIGenerated ? 'ai-generated' : 'themealdb + usda',
+      source: 'openai-gpt4o-mini',
       personalized: userProfile !== null,
       userProfile: userProfile,
     });
