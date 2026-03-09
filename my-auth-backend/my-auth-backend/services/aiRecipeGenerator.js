@@ -445,9 +445,24 @@ Make each recipe DIFFERENT — vary proteins, cooking styles, and sub-cuisines w
     } catch (error) {
       // Silently fail
     }
+    // Fallback to high-quality curated food images since source.unsplash is deprecated
+    const fallbackImages = [
+      'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800', // healthy bowl
+      'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=800', // pizza
+      'https://images.unsplash.com/photo-1490645935967-10de6ba17061?w=800', // healthy setup
+      'https://images.unsplash.com/photo-1473093295043-cdd812d0e601?w=800', // pasta
+      'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=800', // salad bowl
+      'https://images.unsplash.com/photo-1481070555726-e2fe8347714c?w=800', // general food spread
+      'https://images.unsplash.com/photo-1432139555190-58524dae6a55?w=800', // meat
+      'https://images.unsplash.com/photo-1606914501449-5a96b6ce24ca?w=800', // soup/curry
+      'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=800',     // grill/steak
+      'https://images.unsplash.com/photo-1551183053-bf91a1d81141?w=800'      // asian dish
+    ];
 
-    // Fallback to Unsplash
-    return `https://source.unsplash.com/400x300/?${encodeURIComponent(searchQuery)},food,meal`;
+    // Use the name hash to deterministically pick a related-looking fallback picture
+    let hash = 0;
+    for (let i = 0; i < searchQuery.length; i++) hash = searchQuery.charCodeAt(i) + ((hash << 5) - hash);
+    return fallbackImages[Math.abs(hash) % fallbackImages.length];
   }
 }
 
