@@ -59,6 +59,7 @@ const recipesRoutes = require('./routes/recipes');
 const allergensRoutes = require('./routes/allergens');
 const ordersRoutes = require('./routes/orders');
 const ingredientsRoutes = require('./routes/ingredients');
+const paymentRoutes = require('./routes/payments');
 
 // Use routes
 app.use('/api/auth', authRoutes);
@@ -70,6 +71,7 @@ app.use('/api/recipes', recipesRoutes); // Recipes API
 app.use('/api/allergens', allergensRoutes); // AI Allergen Detection & Substitution
 app.use('/api/orders', ordersRoutes); // Order placement & history
 app.use('/api/ingredients', ingredientsRoutes); // User-facing ingredient catalog
+app.use('/api/payments', paymentRoutes); // Stripe payment intent APIs
 const mealplanRoutes = require('./routes/mealplan');
 app.use('/api/mealplan', mealplanRoutes); // Meal planning & I Cooked It
 const behaviorRoutes = require('./routes/behavior');

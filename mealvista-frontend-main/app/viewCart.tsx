@@ -8,18 +8,19 @@ import {
   TouchableOpacity,
   SafeAreaView,
   Alert,
-  ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useCart } from "../contexts/CartContext";
-import api from "../lib/api";
-import { getStoredToken } from "../lib/authStorage";
+import {
+  addCatalogIngredientToCart,
+  releaseCatalogIngredientFromCart,
+} from "../lib/authService";
 
 const CartScreen: React.FC = () => {
   const router = useRouter();
-  const { cartItems, updateQuantity, removeFromCart, getTotalPrice, getTotalItems, clearCart } = useCart();
-  const [placing, setPlacing] = useState(false);
+  const { cartItems, updateQuantity, removeFromCart, getTotalPrice, getTotalItems } = useCart();
+  const [adjustingId, setAdjustingId] = useState<string | null>(null);
 
   const deliveryFee = 0;
   const total = getTotalPrice() + deliveryFee;
@@ -27,44 +28,45 @@ const CartScreen: React.FC = () => {
 
   const handleProceedToCheckout = async () => {
     if (cartItems.length === 0) return;
+    router.push("/checkoutSummary");
+  };
 
+  const increaseItemQuantity = async (item: (typeof cartItems)[number]) => {
     try {
-      setPlacing(true);
-      const token = await getStoredToken();
-      if (!token) {
-        Alert.alert('Sign In Required', 'Please sign in to place an order.');
+      if (!item.ingredientId) {
+        updateQuantity(item.id, item.quantity + 1);
         return;
       }
 
-      const items = cartItems.map(item => ({
-        name: item.name,
-        unitPrice: item.price,
-        quantity: item.quantity,
-        category: item.category || '',
-        image: item.image || '',
-      }));
+      setAdjustingId(item.id);
+      await addCatalogIngredientToCart(item.ingredientId);
+      updateQuantity(item.id, item.quantity + 1);
+    } catch (err: any) {
+      Alert.alert("Out of Stock", err?.response?.data?.message || "Cannot add more of this item.");
+    } finally {
+      setAdjustingId(null);
+    }
+  };
 
-      const res = await api.post(
-        '/api/orders',
-        { items, paymentMethod: 'cash_on_delivery' },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+  const decreaseItemQuantity = async (item: (typeof cartItems)[number]) => {
+    try {
+      if (!item.ingredientId) {
+        updateQuantity(item.id, item.quantity - 1);
+        return;
+      }
 
-      if (res.data.success) {
-        clearCart();
-        Alert.alert(
-          '✅ Order Placed!',
-          `Your order has been placed successfully.\nOrder ID: ${String(res.data.order.id).slice(-8).toUpperCase()}\nTotal: Rs ${res.data.order.totalAmount.toFixed(2)}\nEstimated Delivery: Tomorrow`,
-          [
-            { text: 'View Orders', onPress: () => router.push('/orderHistory' as any) },
-            { text: 'Done', onPress: () => router.push('/home') },
-          ]
-        );
+      setAdjustingId(item.id);
+      await releaseCatalogIngredientFromCart(item.ingredientId, 1);
+
+      if (item.quantity <= 1) {
+        removeFromCart(item.id);
+      } else {
+        updateQuantity(item.id, item.quantity - 1);
       }
     } catch (err: any) {
-      Alert.alert('Order Failed', err?.response?.data?.message || 'Could not place order. Please try again.');
+      Alert.alert("Update Failed", err?.response?.data?.message || "Could not update cart quantity.");
     } finally {
-      setPlacing(false);
+      setAdjustingId(null);
     }
   };
 
@@ -135,6 +137,9 @@ const CartScreen: React.FC = () => {
                   {item.category && (
                     <Text style={styles.categoryText}>{item.category}</Text>
                   )}
+                  {item.unit && (
+                    <Text style={styles.freshnessText}>Unit: {item.unit}</Text>
+                  )}
                   {item.freshness && (
                     <Text style={styles.freshnessText}>{item.freshness}</Text>
                   )}
@@ -147,14 +152,16 @@ const CartScreen: React.FC = () => {
                   <View style={styles.quantityContainer}>
                     <TouchableOpacity
                       style={styles.quantityButton}
-                      onPress={() => updateQuantity(item.id, item.quantity - 1)}
+                      onPress={() => void decreaseItemQuantity(item)}
+                      disabled={adjustingId === item.id}
                     >
                       <Ionicons name="remove" size={16} color="#5A3D7A" />
                     </TouchableOpacity>
                     <Text style={styles.quantityText}>{item.quantity}</Text>
                     <TouchableOpacity
                       style={styles.quantityButton}
-                      onPress={() => updateQuantity(item.id, item.quantity + 1)}
+                      onPress={() => void increaseItemQuantity(item)}
+                      disabled={adjustingId === item.id}
                     >
                       <Ionicons name="add" size={16} color="#5A3D7A" />
                     </TouchableOpacity>
@@ -199,15 +206,10 @@ const CartScreen: React.FC = () => {
       {cartItems.length > 0 && (
         <View style={styles.checkoutContainer}>
           <TouchableOpacity
-            style={[styles.checkoutButton, placing && { opacity: 0.7 }]}
+            style={styles.checkoutButton}
             onPress={handleProceedToCheckout}
-            disabled={placing}
           >
-            {placing ? (
-              <ActivityIndicator color="#fff" size="small" />
-            ) : (
-              <Text style={styles.checkoutText}>Place Order</Text>
-            )}
+            <Text style={styles.checkoutText}>Proceed to Checkout</Text>
             <Text style={styles.checkoutPrice}>RS {total.toFixed(2)}</Text>
           </TouchableOpacity>
         </View>

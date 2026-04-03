@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import {
   View,
   Text,
@@ -8,28 +8,41 @@ import {
   SafeAreaView,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCart } from "../contexts/CartContext";
 
 const PaymentSuccessScreen = () => {
   const router = useRouter();
+  const params = useLocalSearchParams();
   const { getTotalPrice, clearCart } = useCart();
 
   const orderDetails = {
-    orderId: `ORD-2024-${Math.floor(Math.random() * 100000)}`,
-    amountPaid: getTotalPrice() + 30,
-    transactionDate: new Date().toLocaleString("en-US", {
+    orderId: (params.orderId as string) || `ORD-2024-${Math.floor(Math.random() * 100000)}`,
+    amountPaid: Number(params.amountPaid ?? getTotalPrice() + 30),
+    transactionDate: params.transactionDate
+      ? new Date(String(params.transactionDate)).toLocaleString("en-US", {
+          month: "long",
+          day: "numeric",
+          year: "numeric",
+          hour: "numeric",
+          minute: "numeric",
+        })
+      : new Date().toLocaleString("en-US", {
       month: "long",
       day: "numeric",
       year: "numeric",
       hour: "numeric",
       minute: "numeric",
     }),
-    estimatedDelivery: "Tomorrow, 2-4 PM",
+    estimatedDelivery: (params.estimatedDelivery as string) || "Tomorrow, 2-4 PM",
+    paymentMethod: (params.paymentMethod as string) || "stripe_card",
   };
 
+  useEffect(() => {
+    clearCart();
+  }, []);
+
   const handleViewOrderHistory = () => {
-    clearCart(); // Clear cart after successful payment
     router.push("/orderHistory");
   };
 
@@ -86,6 +99,19 @@ const PaymentSuccessScreen = () => {
               <Text style={styles.detailLabel}>Amount Paid</Text>
               <Text style={styles.detailValue}>
                 Rs. {orderDetails.amountPaid.toFixed(2)}
+              </Text>
+            </View>
+          </View>
+
+          {/* Payment Method */}
+          <View style={styles.detailRow}>
+            <View style={styles.detailIconContainer}>
+              <Ionicons name="wallet-outline" size={20} color="#8B7BA8" />
+            </View>
+            <View style={styles.detailContent}>
+              <Text style={styles.detailLabel}>Payment Method</Text>
+              <Text style={styles.detailValue}>
+                {orderDetails.paymentMethod === "cash_on_delivery" ? "Cash on Delivery" : "Stripe Card"}
               </Text>
             </View>
           </View>

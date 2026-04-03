@@ -6,15 +6,21 @@ import {
   ScrollView,
   TouchableOpacity,
   SafeAreaView,
+  Alert,
+  ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCart } from "../contexts/CartContext";
+import api from "../lib/api";
+import { getStoredToken } from "../lib/authStorage";
 
 const PaymentMethodScreen = () => {
   const router = useRouter();
-  const { getTotalPrice } = useCart();
-  const [selectedPayment, setSelectedPayment] = useState("card");
+  const params = useLocalSearchParams();
+  const { getTotalPrice, cartItems } = useCart();
+  const [selectedPayment, setSelectedPayment] = useState<"stripe_card" | "cash_on_delivery">("stripe_card");
+  const [processing, setProcessing] = useState(false);
 
   const orderSummary = {
     subtotal: getTotalPrice(),
@@ -22,8 +28,84 @@ const PaymentMethodScreen = () => {
     total: getTotalPrice() + 30,
   };
 
-  const handleContinue = () => {
-    router.push("/cardDetails");
+  const deliveryAddress = {
+    fullName: String(params.fullName || ""),
+    phone: String(params.phone || ""),
+    addressLine: String(params.addressLine || ""),
+    city: String(params.city || ""),
+    notes: String(params.notes || ""),
+  };
+
+  const placeOrder = async (paymentMethod: "stripe_card" | "cash_on_delivery") => {
+    const token = await getStoredToken();
+    if (!token) {
+      Alert.alert("Sign In Required", "Please sign in to continue.");
+      return;
+    }
+
+    const items = cartItems.map((item) => ({
+      ingredientId: item.ingredientId || null,
+      name: item.name,
+      unitPrice: item.price,
+      quantity: item.quantity,
+      unit: item.unit || "unit",
+      category: item.category || "",
+      image: item.image || "",
+    }));
+
+    return api.post(
+      "/api/orders",
+      {
+        items,
+        paymentMethod,
+        deliveryAddress,
+      },
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+  };
+
+  const handleContinue = async () => {
+    if (!deliveryAddress.fullName || !deliveryAddress.phone || !deliveryAddress.addressLine || !deliveryAddress.city) {
+      Alert.alert("Missing Delivery Details", "Please complete delivery details first.");
+      router.back();
+      return;
+    }
+
+    if (selectedPayment === "stripe_card") {
+      router.push({
+        pathname: "/cardDetails",
+        params: {
+          fullName: deliveryAddress.fullName,
+          phone: deliveryAddress.phone,
+          addressLine: deliveryAddress.addressLine,
+          city: deliveryAddress.city,
+          notes: deliveryAddress.notes,
+        },
+      });
+      return;
+    }
+
+    try {
+      setProcessing(true);
+      const res = await placeOrder("cash_on_delivery");
+      if (res?.data?.success) {
+        const order = res.data.order;
+        router.replace({
+          pathname: "/paymentSuccessful",
+          params: {
+            orderId: String(order.id),
+            amountPaid: String(order.totalAmount),
+            estimatedDelivery: String(order.estimatedDelivery || "Tomorrow, 2-4 PM"),
+            transactionDate: String(order.createdAt || new Date().toISOString()),
+            paymentMethod: "cash_on_delivery",
+          },
+        });
+      }
+    } catch (err: any) {
+      Alert.alert("Order Failed", err?.response?.data?.message || "Could not place cash on delivery order.");
+    } finally {
+      setProcessing(false);
+    }
   };
 
   return (
@@ -51,18 +133,18 @@ const PaymentMethodScreen = () => {
             Select how you'd like to pay for your order
           </Text>
 
-          {/* Credit/Debit Card Option */}
+          {/* Stripe Card Option */}
           <TouchableOpacity
             style={[
               styles.paymentCard,
-              selectedPayment === "card" && styles.paymentCardSelected,
+              selectedPayment === "stripe_card" && styles.paymentCardSelected,
             ]}
-            onPress={() => setSelectedPayment("card")}
+            onPress={() => setSelectedPayment("stripe_card")}
           >
             <View style={styles.paymentCardHeader}>
               <View style={styles.paymentCardLeft}>
                 <View style={styles.radioButton}>
-                  {selectedPayment === "card" && (
+                  {selectedPayment === "stripe_card" && (
                     <View style={styles.radioButtonInner} />
                   )}
                 </View>
@@ -73,17 +155,49 @@ const PaymentMethodScreen = () => {
                   style={styles.paymentIcon}
                 />
                 <View>
-                  <Text style={styles.paymentTitle}>Credit/Debit Card</Text>
+                  <Text style={styles.paymentTitle}>Stripe (Card)</Text>
                   <Text style={styles.paymentSubtitle}>
                     Visa, Mastercard, American Express
                   </Text>
                 </View>
               </View>
-              {selectedPayment === "card" && (
+              {selectedPayment === "stripe_card" && (
                 <View style={styles.popularBadge}>
-                  <Text style={styles.popularText}>Popular</Text>
+                  <Text style={styles.popularText}>Secure</Text>
                 </View>
               )}
+            </View>
+          </TouchableOpacity>
+
+          {/* Cash on Delivery Option */}
+          <TouchableOpacity
+            style={[
+              styles.paymentCard,
+              selectedPayment === "cash_on_delivery" && styles.paymentCardSelected,
+              { marginTop: 12 },
+            ]}
+            onPress={() => setSelectedPayment("cash_on_delivery")}
+          >
+            <View style={styles.paymentCardHeader}>
+              <View style={styles.paymentCardLeft}>
+                <View style={styles.radioButton}>
+                  {selectedPayment === "cash_on_delivery" && (
+                    <View style={styles.radioButtonInner} />
+                  )}
+                </View>
+                <Ionicons
+                  name="cash-outline"
+                  size={24}
+                  color="#2C1A3F"
+                  style={styles.paymentIcon}
+                />
+                <View>
+                  <Text style={styles.paymentTitle}>Cash on Delivery</Text>
+                  <Text style={styles.paymentSubtitle}>
+                    Pay in cash when your order arrives
+                  </Text>
+                </View>
+              </View>
             </View>
           </TouchableOpacity>
         </View>
@@ -138,10 +252,18 @@ const PaymentMethodScreen = () => {
 
       {/* Continue Button */}
       <View style={styles.buttonContainer}>
-        <TouchableOpacity style={styles.continueButton} onPress={handleContinue}>
-          <Text style={styles.continueButtonText}>
-            Continue with Credit/Debit Card
-          </Text>
+        <TouchableOpacity
+          style={[styles.continueButton, processing && { opacity: 0.7 }]}
+          onPress={handleContinue}
+          disabled={processing}
+        >
+          {processing ? (
+            <ActivityIndicator color="#fff" size="small" />
+          ) : (
+            <Text style={styles.continueButtonText}>
+              {selectedPayment === "stripe_card" ? "Continue to Stripe Card" : "Place COD Order"}
+            </Text>
+          )}
         </TouchableOpacity>
       </View>
     </SafeAreaView>

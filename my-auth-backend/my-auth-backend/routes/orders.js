@@ -1,17 +1,16 @@
 const express = require('express');
 const router = express.Router();
 const Order = require('../models/Order');
-const Inventory = require('../models/Inventory');
 const auth = require('../middleware/auth');
 
 /**
  * POST /api/orders
  * Place a new order from the user's cart.
- * Body: { items: [{ name, unitPrice, quantity, category?, image?, ingredientId? }], paymentMethod?, notes? }
+ * Body: { items: [{ name, unitPrice, quantity, category?, image?, ingredientId? }], paymentMethod?, deliveryAddress?, notes? }
  */
 router.post('/', auth, async (req, res) => {
     try {
-        const { items, paymentMethod, notes } = req.body;
+        const { items, paymentMethod, notes, deliveryAddress } = req.body;
 
         if (!items || !Array.isArray(items) || items.length === 0) {
             return res.status(400).json({ success: false, message: 'Cart items are required' });
@@ -31,31 +30,70 @@ router.post('/', auth, async (req, res) => {
         const totalAmount = orderItems.reduce((sum, i) => sum + i.unitPrice * i.quantity, 0);
         const itemCount = orderItems.reduce((sum, i) => sum + i.quantity, 0);
 
-        // Deduct inventory stock for real inventory items
-        for (const item of orderItems) {
-            if (item.ingredientId) {
-                try {
-                    await Inventory.findByIdAndUpdate(
-                        item.ingredientId,
-                        { $inc: { stock: -item.quantity } }
-                    );
-                } catch (e) {
-                    // Non-blocking — log but don't fail order
-                    console.warn(`[Orders] Could not deduct stock for item ${item.ingredientId}:`, e.message);
-                }
-            }
-        }
-
         // Estimated delivery: 1 day from now
         const estimatedDelivery = new Date();
         estimatedDelivery.setDate(estimatedDelivery.getDate() + 1);
+
+        const allowedPaymentMethods = ['cash_on_delivery', 'stripe_card'];
+        const normalizedPaymentMethod = allowedPaymentMethods.includes(paymentMethod)
+            ? paymentMethod
+            : 'cash_on_delivery';
+
+        if (!deliveryAddress || !deliveryAddress.fullName || !deliveryAddress.phone || !deliveryAddress.addressLine || !deliveryAddress.city) {
+            return res.status(400).json({
+                success: false,
+                message: 'Delivery details are required',
+            });
+        }
+
+        const fullName = String(deliveryAddress.fullName || '').trim();
+        const phone = String(deliveryAddress.phone || '').trim();
+        const addressLine = String(deliveryAddress.addressLine || '').trim();
+        const city = String(deliveryAddress.city || '').trim();
+        const cityRegex = /^[A-Za-z\s.-]{2,50}$/;
+        const phoneDigits = phone.replace(/\D/g, '');
+
+        if (fullName.length < 3 || fullName.length > 60) {
+            return res.status(400).json({
+                success: false,
+                message: 'Full name must be between 3 and 60 characters',
+            });
+        }
+
+        if (phoneDigits.length < 10 || phoneDigits.length > 15) {
+            return res.status(400).json({
+                success: false,
+                message: 'Phone number must contain 10 to 15 digits',
+            });
+        }
+
+        if (addressLine.length < 8 || addressLine.length > 150) {
+            return res.status(400).json({
+                success: false,
+                message: 'Address must be between 8 and 150 characters',
+            });
+        }
+
+        if (!cityRegex.test(city)) {
+            return res.status(400).json({
+                success: false,
+                message: 'City format is invalid',
+            });
+        }
 
         const order = new Order({
             userId: req.userId,
             items: orderItems,
             totalAmount,
             itemCount,
-            paymentMethod: paymentMethod || 'cash_on_delivery',
+            paymentMethod: normalizedPaymentMethod,
+            deliveryAddress: {
+                fullName,
+                phone,
+                addressLine,
+                city,
+                notes: String(deliveryAddress.notes || '').trim(),
+            },
             notes: notes || '',
             estimatedDelivery,
         });
@@ -108,6 +146,7 @@ router.get('/my-orders', auth, async (req, res) => {
                 itemCount: o.itemCount,
                 items: o.items,
                 paymentMethod: o.paymentMethod,
+                deliveryAddress: o.deliveryAddress,
                 estimatedDelivery: o.estimatedDelivery,
                 createdAt: o.createdAt,
             })),

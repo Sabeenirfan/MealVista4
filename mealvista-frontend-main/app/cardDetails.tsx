@@ -7,23 +7,30 @@ import {
   TextInput,
   TouchableOpacity,
   SafeAreaView,
+  Alert,
+  ActivityIndicator,
+  Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCart } from "../contexts/CartContext";
+import api from "../lib/api";
+import { getStoredToken } from "../lib/authStorage";
 
-const CardDetailsScreen: React.FC = () => {
+const CardDetailsNative: React.FC = () => {
   const router = useRouter();
-  const { getTotalPrice } = useCart();
+  const params = useLocalSearchParams();
+  const { getTotalPrice, getTotalItems, cartItems } = useCart();
   const [cardNumber, setCardNumber] = useState<string>("");
   const [expiryDate, setExpiryDate] = useState<string>("");
   const [cvv, setCvv] = useState<string>("");
   const [cardName, setCardName] = useState<string>("");
   const [showCvv, setShowCvv] = useState<boolean>(false);
+  const [paying, setPaying] = useState<boolean>(false);
   const [errors, setErrors] = useState<{ cardNumber?: string; expiryDate?: string; cvv?: string; cardName?: string }>({});
 
   const orderSummary = {
-    items: 8,
+    items: getTotalItems(),
     subtotal: getTotalPrice(),
     deliveryFee: 30,
     total: getTotalPrice() + 30,
@@ -132,11 +139,16 @@ const CardDetailsScreen: React.FC = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handlePayNow = () => {
-    // Validate form
-    const ok = runAllValidations();
-    if (!ok) return;
-    router.push("/paymentSuccessful");
+  const handlePayNow = async () => {
+    if (cartItems.length === 0) {
+      Alert.alert("Cart Empty", "Please add items to cart before payment.");
+      return;
+    }
+
+    Alert.alert(
+      "Stripe Not Available",
+      "Stripe card payment is enabled in the native screen. Please run Android/iOS build."
+    );
   };
 
   return (
@@ -286,16 +298,26 @@ const CardDetailsScreen: React.FC = () => {
 
       {/* Pay Now Button */}
       <View style={styles.buttonContainer}>
-        <TouchableOpacity style={styles.payButton} onPress={handlePayNow}>
-          <Ionicons
-            name="lock-closed"
-            size={18}
-            color="#fff"
-            style={styles.lockIcon}
-          />
-          <Text style={styles.payButtonText}>
-            Pay Now • Rs. {orderSummary.total.toFixed(2)}
-          </Text>
+        <TouchableOpacity
+          style={[styles.payButton, paying && { opacity: 0.7 }]}
+          onPress={handlePayNow}
+          disabled={paying}
+        >
+          {paying ? (
+            <ActivityIndicator color="#fff" size="small" />
+          ) : (
+            <>
+              <Ionicons
+                name="lock-closed"
+                size={18}
+                color="#fff"
+                style={styles.lockIcon}
+              />
+              <Text style={styles.payButtonText}>
+                Pay Now • Rs. {orderSummary.total.toFixed(2)}
+              </Text>
+            </>
+          )}
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -428,6 +450,36 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
 });
+
+const CardDetailsScreen: React.FC = () => {
+  const router = useRouter();
+
+  if (Platform.OS === "web") {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+            <Ionicons name="arrow-back" size={24} color="#fff" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Stripe Not Supported on Web</Text>
+        </View>
+        <View style={{ padding: 16 }}>
+          <Text style={{ color: "#fff", fontSize: 14, lineHeight: 20 }}>
+            Stripe card payments work on Android/iOS (native build). For testing, run a development build and open this screen there.
+          </Text>
+          <TouchableOpacity
+            style={{ marginTop: 16, padding: 12, backgroundColor: "#fff", borderRadius: 12, alignItems: "center" }}
+            onPress={() => router.back()}
+          >
+            <Text style={{ color: "#5A3D7A", fontWeight: "700" }}>Go Back</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  return <CardDetailsNative />;
+};
 
 export default CardDetailsScreen;
 

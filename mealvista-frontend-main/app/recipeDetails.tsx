@@ -15,15 +15,19 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useCart } from '../contexts/CartContext';
 import { useFavorites } from '../contexts/FavoritesContext';
 import { useMealPlan } from '../contexts/MealPlanContext';
-import { getProfile } from '../lib/authService';
+import { addCatalogIngredientToCart, getProfile } from '../lib/authService';
 import api from '../lib/api';
 import { getStoredToken } from '../lib/authStorage';
 
 interface Ingredient {
   id: string;
+  rawName: string;
   name: string;
   category: string;
   price: number;
+  inventoryId?: string;
+  stock?: number;
+  recipeQty?: string;
 }
 
 export default function RecipeDetails() {
@@ -35,6 +39,7 @@ export default function RecipeDetails() {
   const [selectedIngredients, setSelectedIngredients] = useState<string[]>([]);
   const [dailyCalorieTarget, setDailyCalorieTarget] = useState<number>(2000);
   const [cookingState, setCookingState] = useState<'idle' | 'cooking' | 'cooked'>('idle');
+  const [ingredientsList, setIngredientsList] = useState<Ingredient[]>([]);
 
   // Load user's daily calorie target from profile + track view
   useEffect(() => {
@@ -59,34 +64,92 @@ export default function RecipeDetails() {
     rating: params.mealRating as string || '4.8',
   };
 
-  // Generate consistent pseudo-random price based on ingredient name string
-  const getPrice = (name: string) => {
-    let hash = 0;
-    for (let i = 0; i < name.length; i++) {
-      hash = name.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    return Math.abs(hash % 80) + 20; // Price between 20 and 100 Rs
+  const cleanIngredientName = (value: string) => {
+    return value
+      .toLowerCase()
+      .replace(/\([^)]*\)/g, ' ')
+      .replace(/\b\d+([./]\d+)?\s*(kg|g|mg|ml|l|tbsp|tsp|cup|cups|oz|lb|packet|packets|piece|pieces|clove|cloves)\b/g, ' ')
+      .replace(/[,/-]/g, ' ')
+      .replace(/\b(chopped|diced|minced|sliced|fresh|ground|whole|boneless|skinless)\b/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
   };
 
-  // Use ingredients passed via params (from backend) when available
-  const passedIngredientsRaw = params.ingredients as string | undefined;
-  const ingredientsList: Ingredient[] = passedIngredientsRaw
-    ? JSON.parse(passedIngredientsRaw).map((name: string, i: number) => ({
-      id: String(i + 1),
-      name,
-      category: 'Pantry',
-      price: getPrice(name),
-    }))
-    : [
-      { id: '1', name: 'Pumpkin Puree', category: 'Canned Goods', price: 3.99 },
-      { id: '2', name: 'Onion', category: 'Vegetables', price: 1.49 },
-      { id: '3', name: 'Garlic', category: 'Vegetables', price: 0.99 },
-      { id: '4', name: 'Vegetable Broth', category: 'Canned Goods', price: 2.99 },
-      { id: '5', name: 'Heavy Cream', category: 'Dairy', price: 4.99 },
-      { id: '6', name: 'Ground Cinnamon', category: 'Spices', price: 2.49 },
-      { id: '7', name: 'Nutmeg', category: 'Spices', price: 2.99 },
-      { id: '8', name: 'Olive Oil', category: 'Oils', price: 5.99 },
-    ];
+  // Keep recipe quantity for display only (not pricing)
+  const extractRecipeQty = (value: string) => {
+    const match = value
+      .trim()
+      .match(/^(\d+([./]\d+)?\s*(kg|g|mg|ml|l|tbsp|tsp|cup|cups|oz|lb|packet|packets|piece|pieces|clove|cloves)?)/i);
+    return match?.[1]?.trim() || '';
+  };
+
+  useEffect(() => {
+    const loadMappedIngredients = async () => {
+      try {
+        const passedIngredientsRaw = params.ingredients as string | undefined;
+        const rawNames: string[] = passedIngredientsRaw
+          ? JSON.parse(passedIngredientsRaw)
+          : [
+              'Pumpkin Puree',
+              'Onion',
+              'Garlic',
+              'Vegetable Broth',
+              'Heavy Cream',
+              'Ground Cinnamon',
+              'Nutmeg',
+              'Olive Oil',
+            ];
+
+        const catalogRes = await api.get('/api/ingredients/catalog', {
+          params: { limit: 1000, page: 1 },
+        });
+        const catalogItems: any[] = catalogRes?.data?.items || [];
+
+        const mapped = rawNames.map((rawName, i) => {
+          const normalizedRaw = cleanIngredientName(rawName);
+          const recipeQty = extractRecipeQty(rawName);
+          const exact = catalogItems.find((item) => cleanIngredientName(item.name) === normalizedRaw);
+          const partial = catalogItems.find((item) => {
+            const normalizedItem = cleanIngredientName(item.name);
+            return (
+              normalizedItem.includes(normalizedRaw) ||
+              normalizedRaw.includes(normalizedItem)
+            );
+          });
+
+          const match = exact || partial;
+          if (!match) {
+            return {
+              id: `recipe-${i + 1}`,
+              rawName,
+              name: rawName,
+              category: 'Not in Inventory',
+              price: 0,
+              stock: 0,
+              recipeQty,
+            };
+          }
+
+          return {
+            id: `recipe-${i + 1}`,
+            rawName,
+            name: match.name,
+            category: match.category,
+            price: Number(match.price) || 0,
+            inventoryId: match.id,
+            stock: Number(match.stock) || 0,
+            recipeQty,
+          };
+        });
+
+        setIngredientsList(mapped);
+      } catch {
+        setIngredientsList([]);
+      }
+    };
+
+    loadMappedIngredients();
+  }, [params.ingredients]);
 
   const handleToggleIngredient = (id: string) => {
     setSelectedIngredients((prev) =>
@@ -94,35 +157,54 @@ export default function RecipeDetails() {
     );
   };
 
-  const handleAddToCart = () => {
+  const handleAddToCart = async () => {
     if (selectedIngredients.length === 0) {
       Alert.alert('No Selection', 'Please select at least one ingredient to add to cart');
       return;
     }
 
     let addedCount = 0;
-    selectedIngredients.forEach((id) => {
+    let notFoundCount = 0;
+    let outOfStockCount = 0;
+
+    for (const id of selectedIngredients) {
       const ingredient = ingredientsList.find((ing) => ing.id === id);
-      if (ingredient) {
-        const itemId = `ingredient-${ingredient.id}`;
-        const alreadyInCart = cartItems.some((c) => c.id === itemId);
-        if (!alreadyInCart) {
-          addToCart({
-            id: itemId,
-            name: ingredient.name,
-            price: ingredient.price,
-            category: ingredient.category,
-          });
-          addedCount += 1;
-        }
+      if (!ingredient || !ingredient.inventoryId) {
+        notFoundCount += 1;
+        continue;
       }
-    });
+
+      if ((ingredient.stock || 0) <= 0) {
+        outOfStockCount += 1;
+        continue;
+      }
+
+      try {
+        const response = await addCatalogIngredientToCart(ingredient.inventoryId);
+        addToCart({
+          id: `catalog-${response.item.id}`,
+          ingredientId: response.item.id,
+          name: response.item.name,
+          price: response.item.price,
+          unit: response.item.unit,
+          category: response.item.category,
+          image: response.item.image,
+        });
+        addedCount += 1;
+      } catch (error: any) {
+        const message = error?.response?.data?.message?.toLowerCase() || '';
+        if (message.includes('out of stock')) outOfStockCount += 1;
+        else notFoundCount += 1;
+      }
+    }
 
     Alert.alert(
-      'Success',
-      addedCount > 0
-        ? `${addedCount} ingredient(s) added to cart`
-        : 'Selected ingredient(s) are already in your cart',
+      'Cart Update',
+      [
+        addedCount > 0 ? `${addedCount} ingredient(s) added from inventory.` : '',
+        outOfStockCount > 0 ? `${outOfStockCount} ingredient(s) are out of stock.` : '',
+        notFoundCount > 0 ? `${notFoundCount} ingredient(s) not found in inventory.` : '',
+      ].filter(Boolean).join('\n') || 'No ingredients were added.',
       [
         {
           text: 'OK',
@@ -449,9 +531,19 @@ export default function RecipeDetails() {
                   </View>
                   <View style={styles.ingredientInfo}>
                     <Text style={styles.ingredientName}>{ingredient.name}</Text>
+                    {!!ingredient.recipeQty && (
+                      <Text style={styles.ingredientCategory}>Recipe Qty: {ingredient.recipeQty}</Text>
+                    )}
                     <Text style={styles.ingredientCategory}>{ingredient.category}</Text>
                   </View>
-                  <Text style={styles.ingredientPrice}>Rs {ingredient.price.toFixed(2)}</Text>
+                  <View style={{ alignItems: 'flex-end' }}>
+                    <Text style={styles.ingredientPrice}>
+                      {ingredient.inventoryId ? `Rs ${ingredient.price.toFixed(2)}` : 'Not Mapped'}
+                    </Text>
+                    <Text style={styles.ingredientCategory}>
+                      {ingredient.inventoryId ? `${ingredient.stock || 0} in stock` : 'No stock data'}
+                    </Text>
+                  </View>
                 </TouchableOpacity>
               );
             })}

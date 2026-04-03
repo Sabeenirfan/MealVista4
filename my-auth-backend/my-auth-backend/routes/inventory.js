@@ -4,6 +4,45 @@ const adminAuth = require('../middleware/adminAuth');
 
 const router = express.Router();
 
+const validateInventoryPayload = (payload, isPartial = false) => {
+  const errors = [];
+  const hasValue = (value) => value !== undefined && value !== null;
+
+  if (!isPartial || hasValue(payload.name)) {
+    if (!payload.name || typeof payload.name !== 'string' || !payload.name.trim()) {
+      errors.push('Name is required');
+    }
+  }
+
+  if (!isPartial || hasValue(payload.category)) {
+    if (!payload.category || typeof payload.category !== 'string' || !payload.category.trim()) {
+      errors.push('Category is required');
+    }
+  }
+
+  if (!isPartial || hasValue(payload.unit)) {
+    if (!payload.unit || typeof payload.unit !== 'string' || !payload.unit.trim()) {
+      errors.push('Unit is required');
+    }
+  }
+
+  if (!isPartial || hasValue(payload.price)) {
+    const priceNum = Number(payload.price);
+    if (!Number.isFinite(priceNum) || priceNum < 0) {
+      errors.push('Price must be a valid non-negative number');
+    }
+  }
+
+  if (!isPartial || hasValue(payload.stock)) {
+    const stockNum = Number(payload.stock);
+    if (!Number.isFinite(stockNum) || stockNum < 0) {
+      errors.push('Stock quantity must be a valid non-negative number');
+    }
+  }
+
+  return errors;
+};
+
 // Get all inventory items with optional category filter
 router.get('/', adminAuth, async (req, res) => {
   try {
@@ -77,15 +116,23 @@ router.get('/:id', adminAuth, async (req, res) => {
 // Create inventory item
 router.post('/', adminAuth, async (req, res) => {
   try {
-    console.log('=== CREATE INVENTORY ITEM ===');
-    console.log('Request body:', JSON.stringify(req.body, null, 2));
-    console.log('Admin user ID:', req.userId);
-    
-    const item = new Inventory(req.body);
+    const validationErrors = validateInventoryPayload(req.body, false);
+    if (validationErrors.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: validationErrors.join(', ')
+      });
+    }
+
+    const item = new Inventory({
+      ...req.body,
+      name: req.body.name.trim(),
+      category: req.body.category.trim(),
+      unit: req.body.unit.trim(),
+      price: Number(req.body.price),
+      stock: Number(req.body.stock)
+    });
     await item.save();
-    
-    console.log('Item created successfully:', item._id);
-    console.log('Item details:', JSON.stringify(item, null, 2));
 
     res.status(201).json({
       success: true,
@@ -107,14 +154,24 @@ router.post('/', adminAuth, async (req, res) => {
 // Update inventory item
 router.patch('/:id', adminAuth, async (req, res) => {
   try {
-    console.log('=== UPDATE INVENTORY ITEM ===');
-    console.log('Item ID:', req.params.id);
-    console.log('Update data:', JSON.stringify(req.body, null, 2));
-    console.log('Admin user ID:', req.userId);
-    
+    const validationErrors = validateInventoryPayload(req.body, true);
+    if (validationErrors.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: validationErrors.join(', ')
+      });
+    }
+
+    const sanitizedPayload = { ...req.body };
+    if (typeof sanitizedPayload.name === 'string') sanitizedPayload.name = sanitizedPayload.name.trim();
+    if (typeof sanitizedPayload.category === 'string') sanitizedPayload.category = sanitizedPayload.category.trim();
+    if (typeof sanitizedPayload.unit === 'string') sanitizedPayload.unit = sanitizedPayload.unit.trim();
+    if (sanitizedPayload.price !== undefined) sanitizedPayload.price = Number(sanitizedPayload.price);
+    if (sanitizedPayload.stock !== undefined) sanitizedPayload.stock = Number(sanitizedPayload.stock);
+
     const item = await Inventory.findByIdAndUpdate(
       req.params.id,
-      { $set: req.body },
+      { $set: sanitizedPayload },
       { new: true, runValidators: true }
     );
 
@@ -125,9 +182,6 @@ router.patch('/:id', adminAuth, async (req, res) => {
         message: 'Item not found'
       });
     }
-
-    console.log('Item updated successfully:', item._id);
-    console.log('Updated item:', JSON.stringify(item, null, 2));
 
     res.json({
       success: true,

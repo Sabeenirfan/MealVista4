@@ -6,6 +6,8 @@ import {
   ScrollView,
   TouchableOpacity,
   SafeAreaView,
+  TextInput,
+  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -14,21 +16,79 @@ import { useCart } from "../contexts/CartContext";
 const CheckoutSummaryScreen = () => {
   const router = useRouter();
   const { cartItems, getTotalPrice } = useCart();
-  const [selectedPayment, setSelectedPayment] = useState("card");
+  const [fullName, setFullName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [addressLine, setAddressLine] = useState("");
+  const [city, setCity] = useState("");
+  const [deliveryNotes, setDeliveryNotes] = useState("");
+  const [errors, setErrors] = useState<{
+    fullName?: string;
+    phone?: string;
+    addressLine?: string;
+    city?: string;
+  }>({});
 
   const subtotal = getTotalPrice();
   const deliveryFee = 30;
   const total = subtotal + deliveryFee;
   const itemCount = cartItems.length;
 
-  const deliveryInfo = {
-    address: "125 Green Street, Sector 15",
-    city: "Noida, UP 201301",
-    estimatedTime: "Tomorrow, 2-4 PM",
+  const validateDeliveryDetails = () => {
+    const nextErrors: {
+      fullName?: string;
+      phone?: string;
+      addressLine?: string;
+      city?: string;
+    } = {};
+
+    const cleanedName = fullName.trim();
+    const cleanedPhone = phone.trim();
+    const cleanedAddress = addressLine.trim();
+    const cleanedCity = city.trim();
+    const cityRegex = /^[A-Za-z\s.-]{2,50}$/;
+    const phoneDigits = cleanedPhone.replace(/\D/g, "");
+
+    if (!cleanedName) nextErrors.fullName = "Full name is required";
+    else if (cleanedName.length < 3 || cleanedName.length > 60) {
+      nextErrors.fullName = "Name must be 3 to 60 characters";
+    }
+
+    if (!cleanedPhone) nextErrors.phone = "Phone number is required";
+    else if (phoneDigits.length < 10 || phoneDigits.length > 15) {
+      nextErrors.phone = "Phone must contain 10 to 15 digits";
+    }
+
+    if (!cleanedAddress) nextErrors.addressLine = "Address is required";
+    else if (cleanedAddress.length < 8 || cleanedAddress.length > 150) {
+      nextErrors.addressLine = "Address must be 8 to 150 characters";
+    }
+
+    if (!cleanedCity) nextErrors.city = "City is required";
+    else if (!cityRegex.test(cleanedCity)) {
+      nextErrors.city = "City format is invalid";
+    }
+
+    setErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
   };
 
   const handleProceedToPayment = () => {
-    router.push("/paymentMethod");
+    const isValid = validateDeliveryDetails();
+    if (!isValid) {
+      Alert.alert("Invalid Details", "Please correct delivery details before continuing.");
+      return;
+    }
+
+    router.push({
+      pathname: "/paymentMethod",
+      params: {
+        fullName: fullName.trim(),
+        phone: phone.trim(),
+        addressLine: addressLine.trim(),
+        city: city.trim(),
+        notes: deliveryNotes.trim(),
+      },
+    });
   };
 
   return (
@@ -89,36 +149,73 @@ const CheckoutSummaryScreen = () => {
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>Delivery Information</Text>
           <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Delivery Address:</Text>
-            <Text style={styles.infoValue}>{deliveryInfo.address}</Text>
-            <Text style={styles.infoValue}>{deliveryInfo.city}</Text>
+            <Text style={styles.infoLabel}>Full Name</Text>
+            <TextInput
+              style={styles.input}
+              value={fullName}
+              onChangeText={(value) => {
+                setFullName(value);
+                if (errors.fullName) setErrors((prev) => ({ ...prev, fullName: undefined }));
+              }}
+              placeholder="Enter full name"
+              placeholderTextColor="#9CA3AF"
+            />
+            {errors.fullName ? <Text style={styles.errorText}>{errors.fullName}</Text> : null}
           </View>
           <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Estimated Delivery:</Text>
-            <Text style={styles.infoValue}>{deliveryInfo.estimatedTime}</Text>
-          </View>
-        </View>
-
-        {/* Payment Method Card */}
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Payment Method</Text>
-          <TouchableOpacity
-            style={styles.paymentOption}
-            onPress={() => setSelectedPayment("card")}
-          >
-            <View style={styles.radioButton}>
-              {selectedPayment === "card" && (
-                <View style={styles.radioButtonInner} />
-              )}
-            </View>
-            <Ionicons
-              name="card-outline"
-              size={20}
-              color="#5A3D7A"
-              style={styles.paymentIcon}
+            <Text style={styles.infoLabel}>Phone Number</Text>
+            <TextInput
+              style={styles.input}
+              value={phone}
+              onChangeText={(value) => {
+                setPhone(value);
+                if (errors.phone) setErrors((prev) => ({ ...prev, phone: undefined }));
+              }}
+              placeholder="03xx-xxxxxxx"
+              placeholderTextColor="#9CA3AF"
+              keyboardType="phone-pad"
             />
-            <Text style={styles.paymentText}>Credit/Debit Card</Text>
-          </TouchableOpacity>
+            {errors.phone ? <Text style={styles.errorText}>{errors.phone}</Text> : null}
+          </View>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>Address</Text>
+            <TextInput
+              style={styles.input}
+              value={addressLine}
+              onChangeText={(value) => {
+                setAddressLine(value);
+                if (errors.addressLine) setErrors((prev) => ({ ...prev, addressLine: undefined }));
+              }}
+              placeholder="House / street / area"
+              placeholderTextColor="#9CA3AF"
+            />
+            {errors.addressLine ? <Text style={styles.errorText}>{errors.addressLine}</Text> : null}
+          </View>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>City</Text>
+            <TextInput
+              style={styles.input}
+              value={city}
+              onChangeText={(value) => {
+                setCity(value);
+                if (errors.city) setErrors((prev) => ({ ...prev, city: undefined }));
+              }}
+              placeholder="Enter city"
+              placeholderTextColor="#9CA3AF"
+            />
+            {errors.city ? <Text style={styles.errorText}>{errors.city}</Text> : null}
+          </View>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>Notes (optional)</Text>
+            <TextInput
+              style={[styles.input, { minHeight: 70, textAlignVertical: "top" }]}
+              value={deliveryNotes}
+              onChangeText={setDeliveryNotes}
+              placeholder="Landmark, instructions, etc."
+              placeholderTextColor="#9CA3AF"
+              multiline
+            />
+          </View>
         </View>
 
         {/* Security Note */}
@@ -137,7 +234,7 @@ const CheckoutSummaryScreen = () => {
           onPress={handleProceedToPayment}
         >
           <Text style={styles.proceedButtonText}>
-            Proceed to Payment • Rs. {total.toFixed(2)}
+            Continue • Rs. {total.toFixed(2)}
           </Text>
         </TouchableOpacity>
       </View>
@@ -277,6 +374,21 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#6B5B7F",
     marginBottom: 6,
+  },
+  input: {
+    backgroundColor: "#F9FAFB",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+    color: "#111827",
+  },
+  errorText: {
+    color: "#DC2626",
+    fontSize: 12,
+    marginTop: 6,
   },
   infoValue: {
     fontSize: 14,

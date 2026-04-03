@@ -21,6 +21,13 @@ const orderSchema = new mongoose.Schema({
         default: 'pending',
     },
     paymentMethod: { type: String, default: 'cash_on_delivery' },
+    deliveryAddress: {
+        fullName: { type: String, default: '' },
+        phone: { type: String, default: '' },
+        addressLine: { type: String, default: '' },
+        city: { type: String, default: '' },
+        notes: { type: String, default: '' },
+    },
     notes: { type: String, default: '' },
     estimatedDelivery: { type: Date },
     createdAt: { type: Date, default: Date.now },

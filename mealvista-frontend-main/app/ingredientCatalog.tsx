@@ -2,12 +2,13 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
     View, Text, ScrollView, Image, TouchableOpacity,
     StyleSheet, StatusBar, TextInput, ActivityIndicator,
-    RefreshControl,
+    RefreshControl, Alert,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useCart } from '../contexts/CartContext';
 import api from '../lib/api';
+import { addCatalogIngredientToCart } from '../lib/authService';
 
 interface IngredientItem {
     id: string;
@@ -77,22 +78,52 @@ export default function IngredientCatalog() {
         }
     };
 
-    const handleAddToCart = (item: IngredientItem) => {
-        addToCart({
-            id: `catalog-${item.id}`,
-            name: item.name,
-            price: item.price,
-            category: item.category,
-            image: item.image,
-        });
-        setAddedIds(prev => new Set([...prev, item.id]));
-        setTimeout(() => {
-            setAddedIds(prev => {
-                const next = new Set(prev);
-                next.delete(item.id);
-                return next;
+    const handleAddToCart = async (item: IngredientItem) => {
+        try {
+            const response = await addCatalogIngredientToCart(item.id);
+            const cartItem = response.item;
+
+            addToCart({
+                id: `catalog-${cartItem.id}`,
+                ingredientId: cartItem.id,
+                name: cartItem.name,
+                price: cartItem.price,
+                unit: cartItem.unit,
+                category: cartItem.category,
+                image: cartItem.image,
             });
-        }, 1500);
+
+            setItems((prev) =>
+                prev.map((current) =>
+                    current.id === cartItem.id
+                        ? {
+                              ...current,
+                              stock: cartItem.stock,
+                              status: cartItem.stock <= 0 ? 'out_of_stock' : current.status,
+                          }
+                        : current
+                )
+            );
+
+            setAddedIds(prev => new Set([...prev, item.id]));
+            setTimeout(() => {
+                setAddedIds(prev => {
+                    const next = new Set(prev);
+                    next.delete(item.id);
+                    return next;
+                });
+            }, 1500);
+        } catch (err: any) {
+            const message = err?.response?.data?.message || 'Unable to add item to cart right now.';
+            if (message.toLowerCase().includes('out of stock')) {
+                setItems((prev) =>
+                    prev.map((current) =>
+                        current.id === item.id ? { ...current, stock: 0, status: 'out_of_stock' } : current
+                    )
+                );
+            }
+            Alert.alert('Add to Cart', message);
+        }
     };
 
     const isInCart = (itemId: string) =>
@@ -226,7 +257,7 @@ export default function IngredientCatalog() {
                                                 isUnavailable && styles.addBtnDisabled,
                                                 justAdded && styles.addBtnAdded,
                                             ]}
-                                            onPress={() => !isUnavailable && !inCart && handleAddToCart(item)}
+                                            onPress={() => !isUnavailable && !inCart && void handleAddToCart(item)}
                                             disabled={isUnavailable}
                                         >
                                             <Feather

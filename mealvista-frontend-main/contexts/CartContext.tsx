@@ -2,10 +2,12 @@ import React, { createContext, useContext, useState, ReactNode } from 'react';
 
 export interface CartItem {
   id: string;
+  ingredientId?: string;
   name: string;
   image?: string;
   price: number;
   quantity: number;
+  unit?: string;
   category?: string;
   freshness?: string;
   isOrganic?: boolean;

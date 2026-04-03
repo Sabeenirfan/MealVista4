@@ -63,6 +63,29 @@ export interface InventoryItem {
   lastRestocked?: string;
 }
 
+export interface CatalogAddToCartResponse {
+  success: boolean;
+  message: string;
+  item: {
+    id: string;
+    name: string;
+    category: string;
+    image: string;
+    unit: string;
+    price: number;
+    stock: number;
+  };
+}
+
+export interface CatalogReleaseFromCartResponse {
+  success: boolean;
+  message: string;
+  item: {
+    id: string;
+    stock: number;
+  };
+}
+
 export interface InventoryResponse {
   items?: InventoryItem[];
   categories?: string[];
@@ -244,6 +267,32 @@ export const deleteInventoryItem = async (itemId: string): Promise<{ success: bo
     return response.data;
   } catch (error: any) {
     console.error('[deleteInventoryItem] Error:', error.response?.data || error.message);
+    throw error;
+  }
+};
+
+// Reserve ingredient stock and return cart-ready data (user side)
+export const addCatalogIngredientToCart = async (ingredientId: string): Promise<CatalogAddToCartResponse> => {
+  try {
+    const response = await api.post<CatalogAddToCartResponse>('/api/ingredients/add-to-cart', { ingredientId });
+    return response.data;
+  } catch (error: any) {
+    throw error;
+  }
+};
+
+// Release previously reserved ingredient stock when quantity decreases/removes
+export const releaseCatalogIngredientFromCart = async (
+  ingredientId: string,
+  quantity: number = 1
+): Promise<CatalogReleaseFromCartResponse> => {
+  try {
+    const response = await api.post<CatalogReleaseFromCartResponse>('/api/ingredients/release-from-cart', {
+      ingredientId,
+      quantity,
+    });
+    return response.data;
+  } catch (error: any) {
     throw error;
   }
 };

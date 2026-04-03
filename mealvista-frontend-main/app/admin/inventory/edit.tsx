@@ -110,8 +110,26 @@ export default function EditIngredient() {
       return;
     }
 
-    if (parseFloat(quantity) < 0) {
-      Alert.alert("Error", "Quantity cannot be negative");
+    if (!price.trim()) {
+      Alert.alert("Error", "Please enter price");
+      return;
+    }
+
+    if (!quantity.trim()) {
+      Alert.alert("Error", "Please enter stock quantity");
+      return;
+    }
+
+    const parsedPrice = Number(price);
+    const parsedQuantity = Number(quantity);
+
+    if (!Number.isFinite(parsedPrice) || parsedPrice < 0) {
+      Alert.alert("Error", "Price must be a valid non-negative number");
+      return;
+    }
+
+    if (!Number.isFinite(parsedQuantity) || parsedQuantity < 0) {
+      Alert.alert("Error", "Stock quantity must be a valid non-negative number");
       return;
     }
 
@@ -120,12 +138,12 @@ export default function EditIngredient() {
       const itemData: any = {
         name: name.trim(),
         category: category.trim(),
-        stock: parseFloat(quantity) || 0,
+        stock: parsedQuantity,
         unit: unit,
-        price: parseFloat(price) || 0,
+        price: parsedPrice,
         available: available,
         status:
-          available && parseFloat(quantity) > 0 ? "in_stock" : "out_of_stock",
+          available && parsedQuantity > 0 ? "in_stock" : "out_of_stock",
       };
 
       if (image) {

@@ -310,92 +310,52 @@ export default function InventoryManagement() {
                 </Text>
               </View>
             ) : (
-              inventoryItems.map((item) => {
-                const itemId = item._id || item.id || '';
-                return (
-                <View 
-                  key={itemId} 
-                  style={styles.itemCard}
-                >
-                  <View style={styles.itemInfo}>
-                    <View style={styles.itemImageContainer}>
-                      {item.image ? (
-                        <Image 
-                          source={{ uri: item.image }} 
-                          style={styles.itemImage}
-                          onError={(e) => console.log("Image load error for", item.name, ":", e.nativeEvent.error)}
-                          onLoad={() => console.log("Image loaded successfully for", item.name)}
-                        />
-                      ) : (
-                        <View style={styles.itemImagePlaceholder}>
-                          <Ionicons name="cube-outline" size={32} color="#9CA3AF" />
-                        </View>
-                      )}
-                    </View>
-                    <View style={styles.itemDetails}>
-                      <Text style={styles.itemName}>{item.name}</Text>
-                      <Text style={styles.itemQuantity}>
-                        {item.stock} {item.unit}
-                      </Text>
-                      <View style={styles.statusContainer}>
-                        <View
-                          style={[
-                            styles.statusBadge,
-                            { backgroundColor: getStatusColor(item.status) === "#10B981" ? "#D1FAE5" : getStatusColor(item.status) === "#F59E0B" ? "#FEF3C7" : "#FEE2E2" },
-                          ]}
-                        >
-                          <Text
-                            style={[
-                              styles.statusText,
-                              { color: getStatusColor(item.status) },
-                            ]}
-                          >
+              <View>
+                {inventoryItems.map((item) => {
+                  const itemId = item._id || item.id || "";
+                  return (
+                    <View key={itemId} style={styles.mobileCard}>
+                      <View style={styles.mobileCardHeader}>
+                        <View style={styles.mobileNameWrap}>
+                          <Text numberOfLines={1} style={styles.itemName}>{item.name}</Text>
+                          <Text style={[styles.statusInline, { color: getStatusColor(item.status) }]}>
                             {getStatusText(item.status)}
                           </Text>
                         </View>
+                        {item.image ? (
+                          <Image source={{ uri: item.image }} style={styles.mobileImage} />
+                        ) : (
+                          <View style={styles.mobileImagePlaceholder}>
+                            <Ionicons name="image-outline" size={18} color="#9CA3AF" />
+                          </View>
+                        )}
+                      </View>
+
+                      <View style={styles.mobileMetaRow}>
+                        <View style={styles.mobileMetaBlock}>
+                          <Text style={styles.mobileLabel}>Price</Text>
+                          <Text style={styles.mobileValue}>Rs {(item.price || 0).toFixed(2)}</Text>
+                        </View>
+                        <View style={styles.mobileMetaBlock}>
+                          <Text style={styles.mobileLabel}>Stock Quantity</Text>
+                          <Text style={styles.mobileValue}>{item.stock} {item.unit}</Text>
+                        </View>
+                      </View>
+
+                      <View style={styles.mobileActions}>
+                        <TouchableOpacity style={styles.editButton} onPress={() => handleEdit(item)}>
+                          <Ionicons name="pencil-outline" size={16} color="#3C2253" />
+                          <Text style={styles.mobileActionText}>Edit</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.deleteButton} onPress={() => handleDelete(item)}>
+                          <Ionicons name="trash-outline" size={16} color="#DC2626" />
+                          <Text style={[styles.mobileActionText, { color: "#DC2626" }]}>Delete</Text>
+                        </TouchableOpacity>
                       </View>
                     </View>
-                  </View>
-                  <View style={styles.actionButtons}>
-                    <TouchableOpacity 
-                      style={styles.editButton}
-                      onPress={() => {
-                        console.log("Edit button pressed for:", item.name);
-                        handleEdit(item);
-                      }}
-                      activeOpacity={0.7}
-                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                    >
-                      <Ionicons name="pencil-outline" size={20} color="#3C2253" />
-                    </TouchableOpacity>
-                    <TouchableOpacity 
-                      style={styles.deleteButton}
-                      onPress={() => {
-                        console.log("=== DELETE BUTTON PRESSED ===");
-                        console.log("Item:", item.name);
-                        console.log("Item _id:", item._id);
-                        console.log("Item id:", item.id);
-                        const itemId = item._id || item.id;
-                        console.log("Using itemId:", itemId);
-                        
-                        if (!itemId) {
-                          Alert.alert("Error", "Item ID is missing. Cannot delete this item.");
-                          console.error("ERROR: No ID found for item:", JSON.stringify(item, null, 2));
-                          return;
-                        }
-                        
-                        console.log("Calling handleDelete function...");
-                        handleDelete(item);
-                      }}
-                      activeOpacity={0.6}
-                      hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
-                    >
-                      <Ionicons name="trash-outline" size={24} color="#DC2626" />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-                );
-              })
+                  );
+                })}
+              </View>
             )}
           </View>
         )}
@@ -441,6 +401,9 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 20,
+    width: "100%",
+    maxWidth: 900,
+    alignSelf: "center",
   },
   searchContainer: {
     flexDirection: "row",
@@ -466,6 +429,7 @@ const styles = StyleSheet.create({
   },
   inventoryContainer: {
     gap: 12,
+    width: "100%",
   },
   itemCard: {
     flexDirection: "row",
@@ -537,6 +501,8 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   editButton: {
+    flexDirection: "row",
+    gap: 6,
     padding: 10,
     backgroundColor: "#F3F4F6",
     borderRadius: 8,
@@ -546,6 +512,8 @@ const styles = StyleSheet.create({
     minHeight: 44,
   },
   deleteButton: {
+    flexDirection: "row",
+    gap: 6,
     padding: 10,
     backgroundColor: "#FEE2E2",
     borderRadius: 8,
@@ -633,6 +601,77 @@ const styles = StyleSheet.create({
     color: "#059669",
     fontWeight: "600",
     marginLeft: 8,
+  },
+  mobileCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: "#F3F4F6",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  mobileCardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 10,
+  },
+  mobileNameWrap: {
+    flex: 1,
+    paddingRight: 12,
+  },
+  mobileImage: {
+    width: 42,
+    height: 42,
+    borderRadius: 10,
+  },
+  mobileImagePlaceholder: {
+    width: 42,
+    height: 42,
+    borderRadius: 10,
+    backgroundColor: "#F3F4F6",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  mobileMetaRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 10,
+    gap: 8,
+  },
+  mobileMetaBlock: {
+    minWidth: 120,
+  },
+  mobileLabel: {
+    fontSize: 11,
+    color: "#6B7280",
+    marginBottom: 2,
+  },
+  mobileValue: {
+    fontSize: 14,
+    color: "#111827",
+    fontWeight: "600",
+  },
+  mobileActions: {
+    flexDirection: "row",
+    gap: 8,
+    justifyContent: "flex-end",
+  },
+  mobileActionText: {
+    fontSize: 12,
+    color: "#3C2253",
+    fontWeight: "600",
+  },
+  statusInline: {
+    fontSize: 11,
+    color: "#6B7280",
+    marginTop: 2,
   },
 });
 
