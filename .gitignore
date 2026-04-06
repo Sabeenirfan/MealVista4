@@ -7,12 +7,3 @@ build/
 *.log
 .env
 
-# Ignore OS / system folders
-AppData/
-Desktop/
-Documents/
-Downloads/
-Music/
-Pictures/
-Videos/
-.env
